@@ -1,0 +1,16 @@
+[[[test.tex
+  [[[Makefile
+test.pdf: test.tex
+	pdflatex test
+  ]]]
+  \documentclass[11pt]{article}
+  
+  \begin{document}
+
+  This is a test.
+  This is a test.
+
+  \end{document}
+
+]]]
+
