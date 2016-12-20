@@ -4,6 +4,9 @@
 import argparse
 import sys
 import re
+import os
+
+OUTPUT_DIR = 'mash_out'
 
 def announce_file_in(fname):
   print >>sys.stderr, "-->", fname
@@ -11,53 +14,83 @@ def announce_file_in(fname):
 def announce_file_out(fname):
   print >>sys.stderr, "<---", fname
 
+class Frame:
+  def __init__(self, _commands, _text=""):
+    self.commands = _commands 
+    self.text = _text
+
+  def append_text(self, new_text):
+    self.text += new_text
+
+  def execute(self, parent):
+    print "execute:"
+    print "  self:", self
+    print "  parent:", parent
+    for command in self.commands.split(';'):
+      command = command.strip()
+      print "  command:", command
+
+      match = re.search(r"^save (.*)", command)
+      if match:
+        target = os.path.join(OUTPUT_DIR, match.group(1))
+        print "Saving to ", target
+        f = open(target, 'w')
+        print >>f, self.text
+        f.close()
+        continue
+
+  def __repr__(self):
+    return "Frame(%s,%s)" % (self.commands.__repr__(), self.text.__repr__())
+
+class RootFrame:
+# Objects of this class act sufficiently like Frame objects to simplify the
+# code below a bit, because they ensure that the stack is never empty, and that
+# every real frame has a parent.
+  def append_text(self, new_text):
+    print "root-level text:", new_text
 
 def mash_string(text):
   # Find the next open or close tag.
-  match = re.search(r"(\[\[\[)|(\]\]\])", text)
+  # match = re.search(r"(\[\[\[)|(\]\]\])", text)
 
-  top_level = '(top level)'
-  stack = [ top_level ]
-  docs = { top_level : '' }
+
+  stack = [ RootFrame() ]
+    # A stack of the various frames we're parsing at the moment.
+    # Each element is a pair:
+    # - The command string
+    # - The text itself.
   
   while text:
+    # Match an opening delimiter?
     match = re.search(r"^\[\[\[(.*)", text)
     if match:
-      filename = match.group(1)
-      print "open:", filename
-      stack.append(filename)
-      docs[filename] = ""
-      print "stack:", stack
+      commands = match.group(1)
+      stack.append(Frame(commands))
       text = text[len(match.group(0)):]
       continue
 
+    # Match a closing delimiter?
     match = re.search(r"^\]\]\]", text)
     if match:
-      print "close"
-      stack.pop()
-      print "stack:", stack
+      completed_frame = stack.pop()
+      completed_frame.execute(stack[-1])
       text = text[3:]
       continue
-
-    match = re.search(r"^\[\[\[(.*)", text)
-    if match:
-      print "open:", match.groups()
     
+    # Not seeing opening or closing delimiters.  Grab as much ordinary text as
+    # we can.  At least one character, until we see [ or ] again.
     match = re.search(r"^(.[^\[\]]*)", text, re.DOTALL)
-
-    print "plain text:", match.groups(0)
+    stack[-1].append_text(match.group(0))
     eaten = match.group(1)
-    docs[stack[-1]] += eaten
-    print (eaten,)
     text = text[len(eaten):]
 
-  for (doc, text) in docs.iteritems():
-    if doc == top_level: continue
-    print doc
-    print text
-    f = open(doc, 'w')
-    print >>f, text
-    f.close()
+  # for (doc, text) in docs.iteritems():
+  #   if doc == top_level: continue
+  #   print doc
+  #   print text
+  #   f = open(doc, 'w')
+  #   print >>f, text
+  #   f.close()
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()

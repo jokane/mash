@@ -1,16 +1,13 @@
-[[[test.tex
-  [[[Makefile
-test.pdf: test.tex
-	pdflatex test
-  ]]]
+[[[save test.tex
   \documentclass[11pt]{article}
   
   \begin{document}
-
-  This is a test.
-  This is a test.
+    This is a test.
+    This is a test.
+    \includegraphics{[[[save foo.dot; print foo
+      graph { a -- b -- c}
+    ]]]}
 
   \end{document}
 
 ]]]
-
