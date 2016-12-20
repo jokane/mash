@@ -1,16 +1,29 @@
-[[[save test.tex; exec pdflatex test; keep test.pdf
+[[[save test.tex; exec pdflatex test; exec bibtex test; exec pdflatex test; keep test.pdf
   \documentclass[11pt]{article}
   \usepackage{graphicx}
   
   \begin{document}
     This is a test.
     This is a test.
+    
+    [[[save test.bib
+    ]]]
 
     [[[save foo.dot; print \includegraphics{foo}; exec dot -Tpdf foo.dot -o foo.pdf
       graph { a -- b -- c}
     ]]]
 
-    More text.
+    [[[append test.bib
+      @book{abc,
+        author = {abc and def},
+        title = {Title of a Book}
+      }
+    ]]]
+
+    More text~\cite{abc}.
+
+    \bibliographystyle{plain}
+    \bibliography{test}
 
   \end{document}
 

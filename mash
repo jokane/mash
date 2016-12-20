@@ -39,6 +39,16 @@ class Frame:
         print >>f, self.text
         f.close()
         continue
+
+      # Save the text to a file.
+      match = re.search(r"^append (.*)", command)
+      if match:
+        target = match.group(1)
+        print "Appending to ", target
+        f = open(target, 'a')
+        print >>f, self.text
+        f.close()
+        continue
       
       # Print a literal into the parent frame.
       match = re.search(r"^print (.*)", command)
@@ -65,6 +75,7 @@ class Frame:
       # - append
       # - cat (insert contents of a file)
       # - read (append/replace the contents of a file to the text of the current frame)
+      # - promote (append the text of the current frame to the text of the parent frame)
       
       # ?
       print command
