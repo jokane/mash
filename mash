@@ -5,6 +5,7 @@ import argparse
 import sys
 import re
 import os
+import subprocess
 
 OUTPUT_DIR = 'mash_out'
 
@@ -30,6 +31,7 @@ class Frame:
       command = command.strip()
       print "  command:", command
 
+      # Save the text to a file.
       match = re.search(r"^save (.*)", command)
       if match:
         target = os.path.join(OUTPUT_DIR, match.group(1))
@@ -38,7 +40,24 @@ class Frame:
         print >>f, self.text
         f.close()
         continue
+      
+      # Print a literal into the parent frame.
+      match = re.search(r"^print (.*)", command)
+      if match:
+        output = match.group(1)
+        parent.append_text(output)
+        continue
 
+      # Execute a command
+      match = re.search(r"^exec (.*)", command)
+      if match:
+        shell_command = match.group(1)
+        os.system(shell_command)
+        continue
+      
+      # ?
+      raise
+  
   def __repr__(self):
     return "Frame(%s,%s)" % (self.commands.__repr__(), self.text.__repr__())
 
