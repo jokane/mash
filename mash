@@ -97,7 +97,7 @@ class Mash:
     parser = argparse.ArgumentParser()
     parser.add_argument(dest='input_filename', help='input filename')
     parser.add_argument('--debug', '-d', dest='debug', help='show debugging information', action='store_true')
-    parser.add_argument('--output_directory', '-o', dest='output_directory', help='directory for output files', default='.mash_cache')
+    parser.add_argument('--output_directory', '-o', dest='output_directory', help='directory for output files', default='.mash-cache')
     self.args = parser.parse_args()
 
     if not os.path.exists(self.args.output_directory):
