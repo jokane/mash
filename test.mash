@@ -1,13 +1,16 @@
-[[[save test.tex; exec pdflatex mash_out/test
+[[[save test.tex; exec pdflatex test; keep test.pdf
   \documentclass[11pt]{article}
   \usepackage{graphicx}
   
   \begin{document}
     This is a test.
     This is a test.
-    [[[save foo.dot; print \includegraphics{mash_out/foo}; exec dot -Tpdf mash_out/foo.dot -o mash_out/foo.eps
+
+    [[[save foo.dot; print \includegraphics{foo}; exec dot -Tpdf foo.dot -o foo.pdf
       graph { a -- b -- c}
     ]]]
+
+    More text.
 
   \end{document}
 
