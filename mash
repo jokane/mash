@@ -19,13 +19,16 @@ class Frame:
   def __init__(self, _commands, _text=""):
     self.commands = _commands 
     self.text = _text
+    self.text_hash = None
 
   def append_text(self, new_text):
     self.text += new_text
 
   def make_name(self, number):
     print "making name for $%s" % number
-    return hashlib.sha1(self.text + number).hexdigest()[:8]
+    if self.text_hash is None:
+      self.text_hash = hashlib.sha1(self.text + number).hexdigest()[:7]
+    return self.text_hash + number
 
   def execute(self, mash, parent):
     print "[[[%s]]]" % self.commands
