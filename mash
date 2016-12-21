@@ -2,6 +2,7 @@
 
 
 import argparse
+import hashlib
 import sys
 import re
 import os
@@ -12,7 +13,7 @@ def announce_file_in(fname):
   print >>sys.stderr, "-->", fname
 
 def announce_file_out(fname):
-  print >>sys.stderr, "<---", fname
+  print >>sys.stderr, "<--", fname
 
 class Frame:
   def __init__(self, _commands, _text=""):
@@ -22,19 +23,25 @@ class Frame:
   def append_text(self, new_text):
     self.text += new_text
 
+  def make_name(self, number):
+    print "making name for $%s" % number
+    return hashlib.sha1(self.text + number).hexdigest()[:8]
+
   def execute(self, mash, parent):
-    print "execute:"
-    print "  self:", self
-    print "  parent:", parent
+    print "[[[%s]]]" % self.commands
+
+    print "  before:", self.commands
+    self.commands = re.sub(r'\$(\d+)', lambda m: self.make_name(m.group(1)), self.commands)
+    print "  after:", self.commands
+
     for command in self.commands.split(';'):
       command = command.strip()
-      print "  command:", command
 
       # Save the text to a file.
       match = re.search(r"^save (.*)", command)
       if match:
         target = match.group(1)
-        print "Saving to ", target
+        announce_file_out(target)
         f = open(target, 'w')
         print >>f, self.text
         f.close()
@@ -97,7 +104,7 @@ class Mash:
     parser = argparse.ArgumentParser()
     parser.add_argument(dest='input_filename', help='input filename')
     parser.add_argument('--debug', '-d', dest='debug', help='show debugging information', action='store_true')
-    parser.add_argument('--output_directory', '-o', dest='output_directory', help='directory for output files', default='.mash-cache')
+    parser.add_argument('--output_directory', '-o', dest='output_directory', help='directory for output files', default='.mash')
     self.args = parser.parse_args()
 
     if not os.path.exists(self.args.output_directory):
@@ -130,7 +137,6 @@ class Mash:
         # Is this a one-liner or a multi-liner?
         match = re.search(r"^(.*)\]\]\]", commands)
         if match:
-          print "one-liner:", commands
           commands = match.group(1)
           Frame(commands).execute(self, stack[-1])
         else:

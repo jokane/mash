@@ -3,15 +3,28 @@
   \usepackage{graphicx}
   
   \begin{document}
-    This is a test.
-    This is a test.
     
     [[[save test.bib]]]
 
-    [[[save foo.dot; print \includegraphics{foo}; exec dot -Tpdf foo.dot -o foo.pdf
+    Here's a graph.
+    \begin{center}
+    [[[save $1.dot; exec dot -Tpdf $1.dot -o $1.pdf; print \includegraphics{$1.pdf}
+      graph {
+        rankdir=LR
+        d -- e
+        d -- f
+      }
+    ]]]
+    \end{center}
+
+    Here's another graph.
+    \begin{center}
+    [[[save $1.dot; exec dot -Tpdf $1.dot -o $1.pdf; print \includegraphics{$1.pdf}
       graph { a -- b -- c}
     ]]]
+    \end{center}
 
+    More details are in some other document~\cite{abc}.
     [[[append test.bib
       @book{abc,
         author = {abc and def},
@@ -19,7 +32,6 @@
       }
     ]]]
 
-    More text~\cite{abc}.
 
     \bibliographystyle{plain}
     \bibliography{test}
