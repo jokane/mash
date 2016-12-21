@@ -1,3 +1,5 @@
+[[[define dot: save #1.dot; !exec sleep 2; !exec dot -Tpdf #1.dot -o #1.pdf; print \includegraphics{$name.pdf}]]]
+
 [[[save test.tex; !exec pdflatex -file-line-error -halt-on-error test > /dev/null; !exec bibtex test; !exec pdflatex test > /dev/null; !exec pdflatex test > test.out; !keep test.pdf
   \documentclass[11pt]{article}
   \usepackage{graphicx}
@@ -28,7 +30,7 @@
 
     Here's another graph.
     \begin{center}
-    [[[save g2.dot; !exec sleep 2; !exec dot -Tpdf g2.dot -o g2.pdf; print \includegraphics{g2.pdf}
+    [[[@dot(g2)
       graph { rankdir=LR; a -- b -- c -- d; b -- d}
     ]]]
     \end{center}

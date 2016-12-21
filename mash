@@ -24,7 +24,10 @@ def announce_file_out(fname):
   print >>sys.stderr, "<--", fname
 
 class Frame:
-  def __init__(self, _commands, _text=""):
+  def __init__(self, _parent, _commands, _text=""):
+    # Remember our parent.
+    self.parent = _parent
+
     # Keep the list of commands.
     self.commands = _commands 
 
@@ -49,14 +52,27 @@ class Frame:
       self.text_hash = hashlib.sha1(self.text + number).hexdigest()[:7]
     return self.text_hash + number
 
-  def execute(self, mash, parent):
+  def execute(self, mash):
     print "[[[%s]]]" % self.commands
+
+    # Is this a macro definition?
+    match = re.search(r'define ([a-zA-Z0-9]+): (.*)', self.commands)
+    if match:
+      name = match.group(1)
+      definition = match.group(2)
+      print name,definition
+      return
 
     # Replace things like $1 with anonymous names based on hashing the text.
     self.commands = re.sub(r'\$(\d+)', lambda m: self.make_name(m.group(1)), self.commands)
 
+    # Split the command list into individual commands.
+    command_list = self.commands.split(';')
+    
     # Loop through the commands we have.
-    for command in self.commands.split(';'):
+    while command_list:
+      command = command_list[0]
+      command_list = command_list[1:]
       command = command.strip()
       print " ", command
 
@@ -71,7 +87,16 @@ class Frame:
         print "    (skipped)"
         continue
 
-      # Save the text to a file.
+      # Is it a macro to expand?
+      match = re.search(r"^@([a-zA-Z0-9]+)\((.*)\)", command)
+      if match:
+        macro_name = match.group(1)
+        macro_args = match.group(2)
+        print "  name:", macro_name
+        print "  args:", macro_args
+        continue
+
+      # Save text to a file.
       match = re.search(r"^save (.*)", command)
       if match:
         target = match.group(1)
@@ -91,6 +116,8 @@ class Frame:
           print >>f, self.text,
           f.close()
           self.dirty = True
+        else:
+          print "    (no change)"
 
         continue
 
@@ -100,7 +127,9 @@ class Frame:
       ###
       ### Instead, it may work to write each separate nugget to an anonymous
       ### file with a certain extension, and then cat those file together in one
-      ### step at the end.
+      ### step at the end.  (Known issue: If things change, then the old versions
+      ### are still around.)
+      ###
       ###
       ### # Save the text to a file.
       ### match = re.search(r"^append (.*)", command)
@@ -117,7 +146,7 @@ class Frame:
       match = re.search(r"^print (.*)", command)
       if match:
         output = match.group(1)
-        parent.append_text(output)
+        self.parent.append_text(output)
         continue
       
       # Read a file (or files) and append their contents to the text of this
@@ -125,7 +154,7 @@ class Frame:
       match = re.search(r"^read (.*)", command)
       if match:
         for filename in glob.glob(match.group(1)):
-          print "reading", filename
+          print "  reading", filename
           f = open(filename, 'r')
           self.append_text(f.read())
           f.close()
@@ -147,7 +176,6 @@ class Frame:
         continue
 
       # Other commands that might make sense:
-      # - read (append/replace the contents of a file to the text of the current frame)
       # - promote (append the text of the current frame to the text of the parent frame)
       
       # ?
@@ -157,7 +185,7 @@ class Frame:
     # All done executing commands.  Last step: If we're dirty, then our parent
     # should be dirty too.
     if self.dirty:
-      parent.dirty = True
+      self.parent.dirty = True
     
     # Done!
     return
@@ -212,9 +240,9 @@ class Mash:
         match = re.search(r"^(.*)\]\]\]", commands)
         if match:
           commands = match.group(1)
-          Frame(commands).execute(self, stack[-1])
+          Frame(stack[-1], commands).execute(self)
         else:
-          stack.append(Frame(commands))
+          stack.append(Frame(stack[-1], commands))
         continue
           
 
@@ -222,7 +250,7 @@ class Mash:
       match = re.search(r"^\]\]\]", text)
       if match:
         completed_frame = stack.pop()
-        completed_frame.execute(self, stack[-1])
+        completed_frame.execute(self)
         text = text[3:]
         continue
       
