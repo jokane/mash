@@ -1,11 +1,9 @@
-[[[
-
 [[[def dot-named: save #1.dot; !exec dot -Tpdf #1.dot -o #1.pdf; print \includegraphics{#1.pdf}]]]
 [[[def dot: @dot-named($1)]]]
-[[[def bibentry: save bib-$1]]]
 [[[def pdflatex: !exec pdflatex -file-line-error -halt-on-error #1]]]
 [[[def latexdoc: save #1.tex; @pdflatex(#1); !exec bibtex #1; @pdflatex(#1); @pdflatex(#1); !keep #1.pdf]]]
 
+[[[def bibentry: save bib-$1]]]
 
 [[[@latexdoc(test)
   \documentclass[11pt]{article}
@@ -59,6 +57,5 @@
 
   \end{document}
 
-]]]
 ]]]
 

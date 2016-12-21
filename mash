@@ -226,18 +226,6 @@ class Frame:
   def __repr__(self):
     return "Frame(%s,%s)" % (self.commands.__repr__(), self.text.__repr__())
 
-class RootFrame:
-# Objects of this class act sufficiently like Frame objects to simplify the
-# code below a bit, because they ensure that the stack is never empty, and that
-# every real frame has a parent.
-  def append_text(self, new_text):
-    new_text = new_text.strip()
-    if new_text:
-      print "root-level text:", new_text
-
-  def resolve_macro(self, name, args):
-    raise Exception('Undefined macro: %s' % name)
-
 
 class Mash:
   def engage(self):
@@ -261,8 +249,9 @@ class Mash:
     self.mash_string(text)
 
   def mash_string(self, text):
-    # A stack of the various frames we're parsing at the moment.
-    stack = [ RootFrame() ]
+    # The current frame for whatever we're parsing now.  This top one has no
+    # parent.
+    current_frame = Frame(None, "")
     
     while text:
       # Match an opening delimiter?
@@ -275,24 +264,24 @@ class Mash:
         match = re.search(r"^(.*)\]\]\]", commands)
         if match:
           commands = match.group(1)
-          Frame(stack[-1], commands).execute(self)
+          Frame(current_frame, commands).execute(self)
         else:
-          stack.append(Frame(stack[-1], commands))
+          current_frame = Frame(current_frame, commands)
         continue
           
 
       # Match a closing delimiter?
       match = re.search(r"^\]\]\]", text)
       if match:
-        completed_frame = stack.pop()
-        completed_frame.execute(self)
+        current_frame.execute(self)
+        current_frame = current_frame.parent
         text = text[3:]
         continue
       
       # Not seeing opening or closing delimiters.  Grab as much ordinary text as
       # we can.  At least one character, until we see [ or ] again.
       match = re.search(r"^(.[^\[\]]*)", text, re.DOTALL)
-      stack[-1].append_text(match.group(0))
+      current_frame.append_text(match.group(0))
       eaten = match.group(1)
       text = text[len(eaten):]
 
