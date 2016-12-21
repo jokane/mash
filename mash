@@ -57,39 +57,38 @@ class Frame:
       self.text_hash = hashlib.sha1(self.text + number).hexdigest()[:7]
     return self.text_hash + number
 
-  def resolve_macro(self, name, args):
+  def resolve_macro(self, name, args_list):
     if name in self.macros:
-      # We have this macro.  Convert it to a list of commands.
-      args_list = args.split(',')
       commands = self.macros[name]
-      print "args_list:", args_list
-      print "commands:", commands
       commands = re.sub(r'#(\d+)', lambda m: args_list[int(m.group(1))-1], commands)
-      print "commands after:", commands
       return commands.split(';')
 
     else:
       # No definition for this macro at this level.  Maybe our parent knows it?
-      return self.parent.resolve_macro(name, args)
+      return self.parent.resolve_macro(name, args_list)
 
 
   def execute(self, mash):
     print "[[[%s]]]" % self.commands
 
+    # Are there any commands?  If not, ingore this frame.  The only reason I
+    # can think of for having a frame with no commmands is have a place for
+    # macros defined at the top level to live.
+    if not self.commands:
+      print "(empty frame)"
+      return
+
     # Is this a macro definition?  These are special because they consme *all*
     # of the commands in the list.  The definition goes in the parent frame
     # (rather than this one), because this frame probably only has the macro
     # definition, and will be going away soon.
-    match = re.search(r'def ([a-zA-Z0-9]+): (.*)', self.commands)
+    match = re.search(r'def ([a-zA-Z0-9-]+): (.*)', self.commands)
     if match:
       name = match.group(1)
       definition = match.group(2)
       self.parent.macros[name] = definition
-      print self.macros
       return
 
-    # Replace things like $1 with anonymous names based on hashing the text.
-    self.commands = re.sub(r'\$(\d+)', lambda m: self.make_name(m.group(1)), self.commands)
 
     # Split the command list into individual commands.
     command_list = self.commands.split(';')
@@ -99,6 +98,9 @@ class Frame:
       command = command_list[0]
       command_list = command_list[1:]
       command = command.strip()
+
+      # Replace things like $1 with anonymous names based on hashing the text.
+      command = re.sub(r'\$(\d+)', lambda m: self.make_name(m.group(1)), command)
       print " ", command
 
       # Commands that start with ! are "build" commands, which we should only
@@ -113,12 +115,16 @@ class Frame:
         continue
 
       # Is it a macro to expand?
-      match = re.search(r"^@([a-zA-Z0-9]+)\((.*)\)", command)
+      match = re.search(r"^@([a-zA-Z0-9-]+)\((.*)\)", command)
       if match:
         macro_name = match.group(1)
-        macro_args = match.group(2)
-        print "  name:", macro_name
-        print "  args:", macro_args
+        macro_args = match.group(2).split(',')
+        command_list = self.resolve_macro(macro_name, macro_args) + command_list
+        continue
+      match = re.search(r"^@([a-zA-Z0-9]+)", command)
+      if match:
+        macro_name = match.group(1)
+        macro_args = list()
         command_list = self.resolve_macro(macro_name, macro_args) + command_list
         continue
 
@@ -180,7 +186,7 @@ class Frame:
       match = re.search(r"^read (.*)", command)
       if match:
         for filename in glob.glob(match.group(1)):
-          print "  reading", filename
+          print "    ", filename
           f = open(filename, 'r')
           self.append_text(f.read())
           f.close()

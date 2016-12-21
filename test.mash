@@ -1,13 +1,19 @@
 [[[
-[[[def dot: save #1.dot; !exec sleep 2; !exec dot -Tpdf #1.dot -o #1.pdf; print \includegraphics{#1.pdf}]]]
 
-[[[save test.tex; !exec pdflatex -file-line-error -halt-on-error test; !exec bibtex test; !exec pdflatex test; !exec pdflatex test; !keep test.pdf
+[[[def dot-named: save #1.dot; !exec dot -Tpdf #1.dot -o #1.pdf; print \includegraphics{#1.pdf}]]]
+[[[def dot: @dot-named($1)]]]
+[[[def bibentry: save bib-$1]]]
+[[[def pdflatex: !exec pdflatex -file-line-error -halt-on-error #1]]]
+[[[def latexdoc: save #1.tex; @pdflatex(#1); !exec bibtex #1; @pdflatex(#1); @pdflatex(#1); !keep #1.pdf]]]
+
+
+[[[@latexdoc(test)
   \documentclass[11pt]{article}
   \usepackage{graphicx}
   
   \begin{document}
 
-    [[[save bib-$1
+    [[[@bibentry
       @book{bcd,
         author = {abc and def},
         title = {Title of a Book},
@@ -18,7 +24,7 @@
     
     Here's a graph~\cite{bcd}:
     \begin{center}
-    [[[save $1.dot; !exec sleep 2; !exec dot -Tpdf $1.dot -o $1.pdf; print \includegraphics{$1.pdf}
+    [[[@dot
       graph {
         rankdir=LR
         d -- e
@@ -31,13 +37,13 @@
 
     Here's another graph.
     \begin{center}
-    [[[@dot(g2)
+    [[[@dot-named(g2)
       graph { rankdir=LR; a -- b -- c -- d; b -- d}
     ]]]
     \end{center}
 
     More details are in some other document~\cite{abc}.
-    [[[save bib-$1
+    [[[@bibentry
       @book{abc,
         author = {abc and def},
         title = {Title of a Another Book},
