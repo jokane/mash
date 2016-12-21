@@ -1,6 +1,7 @@
-[[[define dot: save #1.dot; !exec sleep 2; !exec dot -Tpdf #1.dot -o #1.pdf; print \includegraphics{$name.pdf}]]]
+[[[
+[[[def dot: save #1.dot; !exec sleep 2; !exec dot -Tpdf #1.dot -o #1.pdf; print \includegraphics{#1.pdf}]]]
 
-[[[save test.tex; !exec pdflatex -file-line-error -halt-on-error test > /dev/null; !exec bibtex test; !exec pdflatex test > /dev/null; !exec pdflatex test > test.out; !keep test.pdf
+[[[save test.tex; !exec pdflatex -file-line-error -halt-on-error test; !exec bibtex test; !exec pdflatex test; !exec pdflatex test; !keep test.pdf
   \documentclass[11pt]{article}
   \usepackage{graphicx}
   
@@ -52,5 +53,6 @@
 
   \end{document}
 
+]]]
 ]]]
 

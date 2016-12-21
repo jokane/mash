@@ -44,6 +44,11 @@ class Frame:
     # it might need to be set by a child frame.
     self.dirty = False
 
+    # Keep track of any macros that may be defined, in the form of a hash from
+    # names to definitions.  Note that resolve_macro also looks up the chain of
+    # parent frames, if it cannot find a definition at this level.
+    self.macros = dict()
+
   def append_text(self, new_text):
     self.text += new_text
 
@@ -52,15 +57,35 @@ class Frame:
       self.text_hash = hashlib.sha1(self.text + number).hexdigest()[:7]
     return self.text_hash + number
 
+  def resolve_macro(self, name, args):
+    if name in self.macros:
+      # We have this macro.  Convert it to a list of commands.
+      args_list = args.split(',')
+      commands = self.macros[name]
+      print "args_list:", args_list
+      print "commands:", commands
+      commands = re.sub(r'#(\d+)', lambda m: args_list[int(m.group(1))-1], commands)
+      print "commands after:", commands
+      return commands.split(';')
+
+    else:
+      # No definition for this macro at this level.  Maybe our parent knows it?
+      return self.parent.resolve_macro(name, args)
+
+
   def execute(self, mash):
     print "[[[%s]]]" % self.commands
 
-    # Is this a macro definition?
-    match = re.search(r'define ([a-zA-Z0-9]+): (.*)', self.commands)
+    # Is this a macro definition?  These are special because they consme *all*
+    # of the commands in the list.  The definition goes in the parent frame
+    # (rather than this one), because this frame probably only has the macro
+    # definition, and will be going away soon.
+    match = re.search(r'def ([a-zA-Z0-9]+): (.*)', self.commands)
     if match:
       name = match.group(1)
       definition = match.group(2)
-      print name,definition
+      self.parent.macros[name] = definition
+      print self.macros
       return
 
     # Replace things like $1 with anonymous names based on hashing the text.
@@ -94,6 +119,7 @@ class Frame:
         macro_args = match.group(2)
         print "  name:", macro_name
         print "  args:", macro_args
+        command_list = self.resolve_macro(macro_name, macro_args) + command_list
         continue
 
       # Save text to a file.
@@ -202,6 +228,9 @@ class RootFrame:
     new_text = new_text.strip()
     if new_text:
       print "root-level text:", new_text
+
+  def resolve_macro(self, name, args):
+    raise Exception('Undefined macro: %s' % name)
 
 
 class Mash:
