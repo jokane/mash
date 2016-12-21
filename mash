@@ -1,5 +1,12 @@
 #!/usr/bin/env python
 
+# Q. Why?
+#
+# A1. Allows me to avoid naming things that appear only quickly in passing.
+#
+# A2. Allows me to divide things into files based on content, rather that language.#
+# A3. Can keep content and build instructions in the same place.
+
 
 import argparse
 import hashlib
@@ -17,15 +24,21 @@ def announce_file_out(fname):
 
 class Frame:
   def __init__(self, _commands, _text=""):
+    # Keep the list of commands.
     self.commands = _commands 
+
+    # Maybe start with some text.  We'll probably get more later from
+    # append_text.
     self.text = _text
+
+    # We may need to hash our text as a way of genreating unique but
+    # predictable anonymous filenames.
     self.text_hash = None
 
   def append_text(self, new_text):
     self.text += new_text
 
   def make_name(self, number):
-    print "making name for $%s" % number
     if self.text_hash is None:
       self.text_hash = hashlib.sha1(self.text + number).hexdigest()[:7]
     return self.text_hash + number
@@ -33,26 +46,61 @@ class Frame:
   def execute(self, mash, parent):
     print "[[[%s]]]" % self.commands
 
-    print "  before:", self.commands
+    # Replace things like $1 with anonymous names based on hashing the text.
     self.commands = re.sub(r'\$(\d+)', lambda m: self.make_name(m.group(1)), self.commands)
-    print "  after:", self.commands
+
+    something_changed = False
 
     for command in self.commands.split(';'):
       command = command.strip()
+      print "  command:", command
+
+      # Commands that start with ! are "build" commands, which we should only
+      # execute if something else has changed before this.
+      match = re.search(r'^!(.*)', command)
+      if match:
+        if something_changed:
+          # We need to build.  Drop the ! and continue normally.
+          command = match.group(1)
+        else:
+          # No need to build.  Skip to the next thing.
+          print "    (skipped)"
+          continue
 
       # Save the text to a file.
       match = re.search(r"^save (.*)", command)
       if match:
         target = match.group(1)
         announce_file_out(target)
-        f = open(target, 'w')
-        print >>f, self.text
-        f.close()
+        
+        # Figure out if the file already exists with the same contents.
+        try:
+          f = open(target, 'r')
+          existing_contents = f.read()
+          f.close()
+          
+          exists_already = (existing_contents == self.text)
+          print "existing_contents:", existing_contents
+          print "self.text:", self.text
+          print "exists_already:", exists_already
+
+        except IOError:
+          exists_already = False
+
+        if not exists_already:
+          f = open(target, 'w')
+          print >>f, self.text,
+          f.close()
+          something_changed = True
+        else:
+          print target, "exists already."
+
         continue
 
       # Save the text to a file.
       match = re.search(r"^append (.*)", command)
       if match:
+        something_changed = True
         target = match.group(1)
         print "Appending to ", target
         f = open(target, 'a')
@@ -82,7 +130,6 @@ class Frame:
         continue
 
       # Other commands that might make sense:
-      # - append
       # - cat (insert contents of a file)
       # - read (append/replace the contents of a file to the text of the current frame)
       # - promote (append the text of the current frame to the text of the parent frame)
@@ -99,11 +146,14 @@ class RootFrame:
 # code below a bit, because they ensure that the stack is never empty, and that
 # every real frame has a parent.
   def append_text(self, new_text):
-    print "root-level text:", new_text
+    new_text = new_text.strip()
+    if new_text:
+      print "root-level text:", new_text
 
 
 class Mash:
   def engage(self):
+    # This is the 'main' function.
     parser = argparse.ArgumentParser()
     parser.add_argument(dest='input_filename', help='input filename')
     parser.add_argument('--debug', '-d', dest='debug', help='show debugging information', action='store_true')
@@ -123,12 +173,8 @@ class Mash:
     self.mash_string(text)
 
   def mash_string(self, text):
-    # Find the next open or close tag.
-    # match = re.search(r"(\[\[\[)|(\]\]\])", text)
-
-
+    # A stack of the various frames we're parsing at the moment.
     stack = [ RootFrame() ]
-      # A stack of the various frames we're parsing at the moment.
     
     while text:
       # Match an opening delimiter?

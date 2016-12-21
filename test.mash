@@ -1,34 +1,36 @@
-[[[save test.tex; exec pdflatex test; exec bibtex test; exec pdflatex test; keep test.pdf
+[[[save test.tex; !exec pdflatex -file-line-error -halt-on-error test > /dev/null; !exec bibtex test; !exec pdflatex test > /dev/null; !exec pdflatex test > test.out; keep test.pdf
   \documentclass[11pt]{article}
   \usepackage{graphicx}
   
   \begin{document}
     
-    [[[save test.bib]]]
-
     Here's a graph.
     \begin{center}
-    [[[save $1.dot; exec dot -Tpdf $1.dot -o $1.pdf; print \includegraphics{$1.pdf}
+    [[[save $1.dot; !exec sleep 2; !exec dot -Tpdf $1.dot -o $1.pdf; print \includegraphics{$1.pdf}
       graph {
         rankdir=LR
         d -- e
         d -- f
+        d -- g
+        e -- h
       }
     ]]]
     \end{center}
 
     Here's another graph.
     \begin{center}
-    [[[save $1.dot; exec dot -Tpdf $1.dot -o $1.pdf; print \includegraphics{$1.pdf}
+    [[[save $1.dot; !exec sleep 2; !exec dot -Tpdf $1.dot -o $1.pdf; print \includegraphics{$1.pdf}
       graph { a -- b -- c}
     ]]]
     \end{center}
 
     More details are in some other document~\cite{abc}.
-    [[[append test.bib
+    [[[save test.bib
       @book{abc,
         author = {abc and def},
-        title = {Title of a Book}
+        title = {Title of a Book},
+        publisher = {xyz},
+        year = 2016
       }
     ]]]
 
