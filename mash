@@ -119,18 +119,24 @@ class Mash:
 
     stack = [ RootFrame() ]
       # A stack of the various frames we're parsing at the moment.
-      # Each element is a pair:
-      # - The command string
-      # - The text itself.
     
     while text:
       # Match an opening delimiter?
       match = re.search(r"^\[\[\[(.*)", text)
       if match:
         commands = match.group(1)
-        stack.append(Frame(commands))
         text = text[len(match.group(0)):]
+
+        # Is this a one-liner or a multi-liner?
+        match = re.search(r"^(.*)\]\]\]", commands)
+        if match:
+          print "one-liner:", commands
+          commands = match.group(1)
+          Frame(commands).execute(self, stack[-1])
+        else:
+          stack.append(Frame(commands))
         continue
+          
 
       # Match a closing delimiter?
       match = re.search(r"^\]\]\]", text)
