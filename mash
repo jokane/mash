@@ -24,16 +24,21 @@ def announce_file_out(fname):
   print >>sys.stderr, "<--", fname
 
 class Frame:
-  def __init__(self, _parent, _commands, _text=""):
+  def __init__(self, _parent, _commands, _indent):
     # Remember our parent.
     self.parent = _parent
 
     # Keep the list of commands.
     self.commands = _commands 
 
-    # Maybe start with some text.  We'll probably get more later from
+    # How much indent do we have on the first line?  This will be removed from
+    # each line before processing anything.  Important if the test is python
+    # code.
+    self.indent = _indent
+
+    # Start with no text.  We'll probably get more later from
     # append_text.
-    self.text = _text
+    self.text = ""
 
     # We may need to hash our text as a way of genreating unique but
     # predictable anonymous filenames.
@@ -71,11 +76,9 @@ class Frame:
   def execute(self, mash):
     print "[[[%s]]]" % self.commands
 
-    # Are there any commands?  If not, ingore this frame.  The only reason I
-    # can think of for having a frame with no commmands is have a place for
-    # macros defined at the top level to live.
+    # Are there any commands?  If not, ingore this frame.  Not sure why this
+    # would happen except at the very top level.
     if not self.commands:
-      print "(empty frame)"
       return
 
     # Is this a macro definition?  These are special because they consme *all*
@@ -89,6 +92,9 @@ class Frame:
       self.parent.macros[name] = definition
       return
 
+    # Fix the indentation of the text.
+    print "indent is", self.indent
+    self.text = re.sub("\n\s{%d}" % self.indent, "\n", self.text)
 
     # Split the command list into individual commands.
     command_list = self.commands.split(';')
@@ -251,22 +257,24 @@ class Mash:
   def mash_string(self, text):
     # The current frame for whatever we're parsing now.  This top one has no
     # parent.
-    current_frame = Frame(None, "")
+    current_frame = Frame(None, "" , 0)
     
     while text:
       # Match an opening delimiter?
-      match = re.search(r"^\[\[\[(.*)", text)
+      match = re.search(r"^\[\[\[(.*)\n(\s*)", text)
       if match:
         commands = match.group(1)
+        indent = match.group(2)
+        print "indent", commands, "by", len(indent)
         text = text[len(match.group(0)):]
 
         # Is this a one-liner or a multi-liner?
         match = re.search(r"^(.*)\]\]\]", commands)
         if match:
           commands = match.group(1)
-          Frame(current_frame, commands).execute(self)
+          Frame(current_frame, commands, len(indent)).execute(self)
         else:
-          current_frame = Frame(current_frame, commands)
+          current_frame = Frame(current_frame, commands, len(indent))
         continue
           
 
