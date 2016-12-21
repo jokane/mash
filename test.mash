@@ -3,8 +3,17 @@
   \usepackage{graphicx}
   
   \begin{document}
+
+    [[[save bib-$1
+      @book{bcd,
+        author = {abc and def},
+        title = {Title of a Book},
+        publisher = {xyz},
+        year = 2016
+      }
+    ]]]
     
-    Here's a graph.
+    Here's a graph~\cite{bcd}:
     \begin{center}
     [[[save $1.dot; !exec sleep 2; !exec dot -Tpdf $1.dot -o $1.pdf; print \includegraphics{$1.pdf}
       graph {
@@ -25,14 +34,16 @@
     \end{center}
 
     More details are in some other document~\cite{abc}.
-    [[[save test.bib
+    [[[save bib-$1
       @book{abc,
         author = {abc and def},
-        title = {Title of a Book},
+        title = {Title of a Another Book},
         publisher = {xyz},
-        year = 2016
+        year = 2017
       }
     ]]]
+
+    [[[read bib-*; save test.bib]]]
 
     \bibliographystyle{plain}
     \bibliography{test}
@@ -40,3 +51,4 @@
   \end{document}
 
 ]]]
+

@@ -15,6 +15,7 @@ import re
 import os
 import subprocess
 import shutil
+import glob
 
 def announce_file_in(fname):
   print >>sys.stderr, "-->", fname
@@ -118,8 +119,20 @@ class Frame:
         output = match.group(1)
         parent.append_text(output)
         continue
+      
+      # Read a file (or files) and append their contents to the text of this
+      # frame.
+      match = re.search(r"^read (.*)", command)
+      if match:
+        for filename in glob.glob(match.group(1)):
+          print "reading", filename
+          f = open(filename, 'r')
+          self.append_text(f.read())
+          f.close()
+        continue
 
-      # Execute a command
+
+      # Execute a shell command.
       match = re.search(r"^exec (.*)", command)
       if match:
         shell_command = match.group(1)
