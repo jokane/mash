@@ -10,7 +10,8 @@
   \usepackage{graphicx}
   
   \begin{document}
-    [[[save $1.py; exec python $1.py
+    Here are some Fibonacci numbers:
+    [[[filter python; push
       a = 0
       b = 1
       for i in range(1, 10):
@@ -19,6 +20,13 @@
         b = c
         print c
     ]]]
+
+    Here are some squares:
+    [[[save $1.py; !exec python $1.py > $2.tex; print \input{$2.tex}
+      for i in range(1, 10):
+        print i*i
+    ]]]
+
   
     [[[@bibentry
       @book{bcd,

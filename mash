@@ -198,13 +198,29 @@ class Frame:
           f.close()
         continue
 
-
-      # Execute a shell command.
+      # Execute a shell command, allowing its output to go to the terminal in
+      # which mash is running, and without changing the text.
       match = re.search(r"^exec (.*)", command)
       if match:
         shell_command = match.group(1)
         os.system(shell_command)
         continue
+
+      # Filter the text through a shell command.
+      match = re.search(r"^filter (.*)", command)
+      if match:
+        shell_command = match.group(1)
+        p = subprocess.Popen(shell_command, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        self.text = p.communicate(input=self.text)[0]
+        print "new text:", self.text
+        continue
+
+      # Push our text up into the parent frame.
+      match = re.search(r"^push", command)
+      if match:
+        self.parent.append_text(self.text)
+        continue
+
 
       # Keep a file, by copying it to the input directory.
       match = re.search(r"^keep (.*)", command)
