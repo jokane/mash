@@ -8,35 +8,16 @@
 [[[@latexdoc(test)
   \documentclass[11pt]{article}
   \usepackage{graphicx}
-  
+  \usepackage{fullpage}
+
   \begin{document}
-    Here are some Fibonacci numbers:
-    [[[filter python; push
-      a = 0
-      b = 1
-      for i in range(1, 10):
-        c = a + b
-        a = b
-        b = c
-        print c
-    ]]]
-
-    Here are some squares:
-    [[[save $1.py; !exec python $1.py > $2.tex; print \input{$2.tex}
-      for i in range(1, 10):
-        print i*i
-    ]]]
-
-  
-    [[[@bibentry
-      @book{bcd,
-        author = {abc and def},
-        title = {Title of a Book},
-        publisher = {xyz},
-        year = 2016
-      }
-    ]]]
+    \title{Examples of \texttt{mash} usage}
+    \date{[[[filter stat -c %y ../test.mash; strip; push]]]
+    }
+    \maketitle
     
+    \section{Graphviz}
+
     Here's a graph~\cite{bcd}:
     \begin{center}
     [[[@dot
@@ -57,13 +38,49 @@
     ]]]
     \end{center}
 
-    More details are in some other document~\cite{abc}.
+    \section{Python}
+
+    Here are some Fibonacci numbers (which are computed every time we mash this document):
+    $$
+      [[[unindent; filter python; strip; push
+        a = 0
+        b = 1
+        for i in range(1, 10):
+          c = a + b
+          a = b
+          b = c
+          print c, "\\qquad",
+      ]]]
+    $$
+
+    Here are some squares (which should be computed only when the code changes):
+    [[[unindent; save $1.py; !exec python $1.py > $2.tex; print \input{$2.tex}
+      print "$$"
+      for i in range(1, 10):
+        print i*i, "\\qquad"
+      print "$$"
+    ]]]
+
+
+    \section{Citations}
     [[[@bibentry
       @book{abc,
-        author = {abc and def},
+        author = {A. B. Cee and D. E. Eff},
         title = {Title of a Another Book},
         publisher = {xyz},
         year = 2017
+      }
+    ]]]
+
+    Here is a citation~\cite{abc} and another one~\cite{bcd}.  This
+    bibliography is assembled from the entries defined above.
+
+    [[[@bibentry
+      @book{bcd,
+        author = {A. B. Cee and D. E. Eff},
+        title = {Title of a Book},
+        publisher = {xyz},
+        year = 2016
       }
     ]]]
 

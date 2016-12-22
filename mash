@@ -92,9 +92,6 @@ class Frame:
       self.parent.macros[name] = definition
       return
 
-    # Fix the indentation of the text.
-    print "indent is", self.indent
-    self.text = re.sub("\n\s{%d}" % self.indent, "\n", self.text)
 
     # Split the command list into individual commands.
     command_list = self.commands.split(';')
@@ -215,12 +212,23 @@ class Frame:
         print "new text:", self.text
         continue
 
+      # Strip leading a trailing spaces.
+      match = re.search(r"^strip", command)
+      if match:
+        self.text = self.text.strip()
+        continue
+
       # Push our text up into the parent frame.
       match = re.search(r"^push", command)
       if match:
         self.parent.append_text(self.text)
         continue
 
+      # Fix the indentation of the text.
+      match = re.search(r"^unindent", command)
+      if match:
+        self.text = re.sub("\n\s{%d}" % self.indent, "\n", self.text)
+        continue
 
       # Keep a file, by copying it to the input directory.
       match = re.search(r"^keep (.*)", command)
@@ -281,7 +289,6 @@ class Mash:
       if match:
         commands = match.group(1)
         indent = match.group(2)
-        print "indent", commands, "by", len(indent)
         text = text[len(match.group(0)):]
 
         # Is this a one-liner or a multi-liner?
