@@ -209,7 +209,6 @@ class Frame:
         shell_command = match.group(1)
         p = subprocess.Popen(shell_command, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         self.text = p.communicate(input=self.text)[0]
-        print "new text:", self.text
         continue
 
       # Strip leading a trailing spaces.
@@ -292,10 +291,12 @@ class Mash:
         text = text[len(match.group(0)):]
 
         # Is this a one-liner or a multi-liner?
-        match = re.search(r"^(.*)\]\]\]", commands)
+        match = re.search(r"^(.*?)\]\]\](.*)", commands)
         if match:
+          # One liner.
           commands = match.group(1)
           Frame(current_frame, commands, len(indent)).execute(self)
+          text = match.group(2) + text
         else:
           current_frame = Frame(current_frame, commands, len(indent))
         continue

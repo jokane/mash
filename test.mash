@@ -12,8 +12,8 @@
 
   \begin{document}
     \title{Examples of \texttt{mash} usage}
-    \date{[[[filter stat -c %y ../test.mash; strip; push]]]
-    }
+    \date{Built from \texttt{test.mash}, modified on [[[filter stat -c %y ../test.mash | cut -b 1-10; strip; push]]].}
+    \author{Compiled by \texttt{[[[filter whoami; strip; push]]]} on \textbf{[[[filter date; strip; push]]]}.}
     \maketitle
     
     \section{Graphviz}
