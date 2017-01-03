@@ -5,7 +5,7 @@
 
 [[[def bibentry: save bib-$1]]]
 
-[[[@latexdoc(test)
+[[[@latexdoc(examples)
   \documentclass[11pt]{article}
   \usepackage{graphicx}
   \usepackage{fullpage}
@@ -13,7 +13,7 @@
   \begin{document}
     \title{Examples of \texttt{mash} usage}
     \date{Built from \texttt{test.mash}, modified on [[[filter stat -c %y ../test.mash | cut -b 1-10; strip; push]]].}
-    \author{Compiled by \texttt{[[[filter whoami; strip; push]]]} on \textbf{[[[filter date; strip; push]]]}.}
+    \author{Compiled by \texttt{[[[filter whoami; strip; push]]]} on \textbf{[[[filter date -I; strip; push]]]}.}
     \maketitle
     
     \section{Graphviz}
@@ -61,6 +61,9 @@
       print "$$"
     ]]]
 
+    \section{Include Files}
+    [[[include included.mash; push]]]
+
 
     \section{Citations}
     [[[@bibentry
@@ -89,6 +92,21 @@
     \bibliographystyle{plain}
     \bibliography{test}
 
+  \end{document}
+
+]]]
+
+[[[@latexdoc(manual)
+  \documentclass[11pt]{article}
+
+  \begin{document}
+
+    \section{Introduction}
+    Mash is a tool for manipulating small snippets of text.  A mash document
+    consists of one or more \emph{frames}, which may be nested within each
+    other.  Each frame has a list of zero or more \emph{commands} along with a
+    block of \emph{text} on which those commands operate.
+   
   \end{document}
 
 ]]]

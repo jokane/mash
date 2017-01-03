@@ -3,8 +3,7 @@
 # Q. Why?
 #
 # A1. Allows me to avoid naming things that appear only quickly in passing.
-#
-# A2. Allows me to divide things into files based on content, rather that language.#
+# A2. Allows me to divide things into files based on content, rather than language.
 # A3. Can keep content and build instructions in the same place.
 
 
@@ -74,10 +73,13 @@ class Frame:
 
 
   def execute(self, mash):
+    # Called when this frame's command and text have been fully read from the
+    # input file.  Executes the commands.
     print "[[[%s]]]" % self.commands
 
     # Are there any commands?  If not, ingore this frame.  Not sure why this
-    # would happen except at the very top level.
+    # would happen except at the very top level, or for frames that contain
+    # only comments.
     if not self.commands:
       return
 
@@ -151,6 +153,7 @@ class Frame:
           print >>f, self.text,
           f.close()
           self.dirty = True
+          #print "File has changed.  Marking this frame dirty."
         else:
           print "    (no change)"
 
@@ -229,7 +232,15 @@ class Frame:
         self.text = re.sub("\n\s{%d}" % self.indent, "\n", self.text)
         continue
 
-      # Keep a file, by copying it to the input directory.
+      # Include another mash file.
+      match = re.search(r"^include (.*)", command)
+      if match:
+        file_to_include = match.group(1)
+        include_text = open(os.path.join(mash.original_directory, file_to_include), 'r').read()
+        mash.mash_string(include_text, self)
+        continue
+
+      # Keep a file by copying it to the input directory.
       match = re.search(r"^keep (.*)", command)
       if match:
         file_to_keep = match.group(1)
@@ -246,6 +257,7 @@ class Frame:
     # All done executing commands.  Last step: If we're dirty, then our parent
     # should be dirty too.
     if self.dirty:
+      #print "Marking parent frame dirty."
       self.parent.dirty = True
     
     # Done!
@@ -275,12 +287,14 @@ class Mash:
     text = open(self.args.input_filename, 'r').read()
 
     os.chdir(self.args.output_directory)
-    self.mash_string(text)
+    self.mash_string(text, Frame(None, "", 0))
 
-  def mash_string(self, text):
+  def mash_string(self, text, top_frame):
     # The current frame for whatever we're parsing now.  This top one has no
     # parent.
-    current_frame = Frame(None, "" , 0)
+    current_frame = top_frame
+
+    print "MASH MASH MASH:", current_frame.text
     
     while text:
       # Match an opening delimiter?
