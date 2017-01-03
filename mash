@@ -8,6 +8,7 @@
 
 
 import argparse
+import filecmp
 import hashlib
 import sys
 import re
@@ -153,7 +154,6 @@ class Frame:
           print >>f, self.text,
           f.close()
           self.dirty = True
-          #print "File has changed.  Marking this frame dirty."
         else:
           print "    (no change)"
 
@@ -257,18 +257,26 @@ class Frame:
       if match:
         file_to_import = match.group(1)
         fr = os.path.join(mash.original_directory, file_to_import)
-        to = mash.args.output_directory
-        print "importing", file_to_import, "to", to
-        shutil.copy(fr, to)
-        self.dirty = True
+        to = os.path.join(mash.args.output_directory, file_to_import)
+
+        # Does this file exist already?
+        if os.path.isfile(to) and filecmp.cmp(fr, to, False):
+          # Yes.  Nothing to do.
+          print "    (no change)"
+          pass
+        else:
+          # No.  Copy it in and set the dirty flag.
+          print "    (importing)"
+          shutil.copyfile(fr, to)
+          self.dirty = True
+
         continue
 
       # Other commands that might make sense:
       # - promote (append the text of the current frame to the text of the parent frame)
       
       # ?
-      print command
-      raise
+      raise Exception("Unknown command: %s" % command)
 
     # All done executing commands.  Last step: If we're dirty, then our parent
     # should be dirty too.
@@ -290,12 +298,17 @@ class Mash:
     parser = argparse.ArgumentParser()
     parser.add_argument(dest='input_filename', help='input filename')
     parser.add_argument('--debug', '-d', dest='debug', help='show debugging information', action='store_true')
-    parser.add_argument('--output_directory', '-o', dest='output_directory', help='directory for output files', default='.mash')
+    parser.add_argument('--output_directory', '-o', dest='output_directory', help='directory for output files', default=os.path.join(os.getcwd(), '.mash'))
+    parser.add_argument('--clean', '-c', dest='clean', action='store_true')
     self.args = parser.parse_args()
+
+    if self.args.clean:
+      shutil.rmtree(self.args.output_directory)
 
     if not os.path.exists(self.args.output_directory):
       announce_file_out(self.args.output_directory) 
       os.makedirs(self.args.output_directory)
+
 
     self.original_directory = os.getcwd()
 
