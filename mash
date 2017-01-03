@@ -244,6 +244,8 @@ class Frame:
         file_to_include = match.group(1)
         include_text = open(os.path.join(mash.original_directory, file_to_include), 'r').read()
         mash.mash_string(include_text, self)
+        self.parent.append_text(self.text)
+        self.parent.macros.update(self.macros)
         continue
 
       # Keep a file by copying it to the input directory.
@@ -330,17 +332,26 @@ class Mash:
       if match:
         commands = match.group(1)
         indent = match.group(2)
+
+        # Remove the part that matched from the input text.
         text = text[len(match.group(0)):]
 
         # Is this a one-liner or a multi-liner?
-        match = re.search(r"^(.*?)\]\]\](.*)", commands)
-        if match:
-          # One liner.
-          commands = match.group(1)
+        match2 = re.search(r"^(.*?)\]\]\](.*)", commands)
+        if match2:
+          # A one line frame.  Create the frame and execute it right away.
+          # Then put everything we've matched after that (including the newline
+          # and indent matched in the first re above) back in at the front of
+          # the input text.
+          commands = match2.group(1)
           Frame(current_frame, commands, len(indent)).execute(self)
-          text = match.group(2) + text
+          text = match2.group(2) + '\n' + indent + text
         else:
+          # A multi-line frame.  Create a new frame as the child of the current
+          # one.  We'll add the text in future iterations of this loop, and
+          # execute when we see the closing delimiter.
           current_frame = Frame(current_frame, commands, len(indent))
+        
         continue
           
 

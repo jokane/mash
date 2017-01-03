@@ -74,7 +74,7 @@
     ]]]
 
     \section{Include Files}
-    [[[include included.mash; push]]]
+    [[[include included.mash]]]
 
 
     \section{Citations}
