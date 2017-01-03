@@ -223,10 +223,11 @@ class Frame:
         self.text = self.text.strip()
         continue
 
-      # Push our text up into the parent frame.
+      # Push our text and macros up into the parent frame.
       match = re.search(r"^push", command)
       if match:
         self.parent.append_text(self.text)
+        self.parent.macros.update(self.macros)
         continue
 
       # Fix the indentation of the text.
