@@ -87,7 +87,7 @@ class Frame:
     # of the commands in the list.  The definition goes in the parent frame
     # (rather than this one), because this frame probably only has the macro
     # definition, and will be going away soon.
-    match = re.search(r'def ([a-zA-Z0-9-]+): (.*)', self.commands)
+    match = re.search(r'def ([a-zA-Z0-9_-]+): (.*)', self.commands)
     if match:
       name = match.group(1)
       definition = match.group(2)
@@ -120,7 +120,7 @@ class Frame:
         continue
 
       # Is it a macro to expand?
-      match = re.search(r"^@([a-zA-Z0-9-]+)\((.*)\)", command)
+      match = re.search(r"^@([a-zA-Z0-9_-]+)\((.*)\)", command)
       if match:
         macro_name = match.group(1)
         macro_args = match.group(2).split(',')
@@ -199,11 +199,14 @@ class Frame:
         continue
 
       # Execute a shell command, allowing its output to go to the terminal in
-      # which mash is running, and without changing the text.
+      # which mash is running, and without changing the text.  Complain if the
+      # command returns a non-zero (error) return code.
       match = re.search(r"^exec (.*)", command)
       if match:
         shell_command = match.group(1)
-        os.system(shell_command)
+        return_code = os.system(shell_command)
+        if return_code != 0:
+          raise Exception("Shell command '%s' failed with return code %d." % (shell_command, return_code))
         continue
 
       # Filter the text through a shell command.
@@ -232,6 +235,8 @@ class Frame:
         self.text = re.sub("\n\s{%d}" % self.indent, "\n", self.text)
         continue
 
+
+
       # Include another mash file.
       match = re.search(r"^include (.*)", command)
       if match:
@@ -245,6 +250,17 @@ class Frame:
       if match:
         file_to_keep = match.group(1)
         shutil.copy(file_to_keep, mash.original_directory)
+        continue
+
+      # Import a file from the input directory into the build directory.
+      match = re.search(r"^import (.*)", command)
+      if match:
+        file_to_import = match.group(1)
+        fr = os.path.join(mash.original_directory, file_to_import)
+        to = mash.args.output_directory
+        print "importing", file_to_import, "to", to
+        shutil.copy(fr, to)
+        self.dirty = True
         continue
 
       # Other commands that might make sense:
@@ -293,8 +309,6 @@ class Mash:
     # The current frame for whatever we're parsing now.  This top one has no
     # parent.
     current_frame = top_frame
-
-    print "MASH MASH MASH:", current_frame.text
     
     while text:
       # Match an opening delimiter?

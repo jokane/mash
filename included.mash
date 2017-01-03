@@ -1,1 +1,3 @@
-Here is some text that is included from a different file.
+Here is some text that is included from a different file using an
+\texttt{include} statement.  It is processed as a \texttt{mash} document
+itself.
