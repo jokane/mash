@@ -236,6 +236,11 @@ class Frame:
         self.text = re.sub("\n\s{%d}" % self.indent, "\n", self.text)
         continue
 
+      # Clear the current text.
+      match = re.search(r"^clear", command)
+      if match:
+        self.text = ""
+        continue
 
 
       # Include another mash file.
