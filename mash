@@ -15,6 +15,7 @@ import re
 import os
 import subprocess
 import shutil
+import difflib
 import glob
 
 def announce_file_in(fname):
@@ -140,6 +141,7 @@ class Frame:
         target = match.group(1)
         
         # Figure out if the file already exists with the same contents.
+        existing_contents = ''
         try:
           f = open(target, 'r')
           existing_contents = f.read()
@@ -149,6 +151,7 @@ class Frame:
           exists_already = False
 
         if not exists_already:
+          print ''.join(difflib.unified_diff(existing_contents.splitlines(1), self.text.splitlines(1)))
           announce_file_out(target)
           f = open(target, 'w')
           print >>f, self.text,
