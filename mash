@@ -307,19 +307,25 @@ class Mash:
   def engage(self):
     # This is the 'main' function.
     parser = argparse.ArgumentParser()
-    parser.add_argument(dest='input_filename', help='input filename')
+    parser.add_argument(dest='input_filename', help='input filename', nargs='?')
     parser.add_argument('--debug', '-d', dest='debug', help='show debugging information', action='store_true')
     parser.add_argument('--output_directory', '-o', dest='output_directory', help='directory for output files', default=os.path.join(os.getcwd(), '.mash'))
     parser.add_argument('--clean', '-c', dest='clean', action='store_true')
     self.args = parser.parse_args()
 
     if self.args.clean:
-      shutil.rmtree(self.args.output_directory)
+      if os.path.exists(self.args.output_directory):
+        shutil.rmtree(self.args.output_directory)
+      if self.args.input_filename is None:
+        return
+
+    if self.args.input_filename is None:
+      parser.print_help()
+      sys.exit(1)
 
     if not os.path.exists(self.args.output_directory):
       announce_file_out(self.args.output_directory) 
       os.makedirs(self.args.output_directory)
-
 
     self.original_directory = os.getcwd()
 
