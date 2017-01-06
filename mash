@@ -231,6 +231,8 @@ class Frame:
         shell_command = match.group(1)
         p = subprocess.Popen(shell_command, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         self.text = p.communicate(input=self.text)[0]
+        if p.returncode != 0:
+          raise Exception("Filter command '%s' failed with return code %d." % (shell_command, p.returncode))
         continue
 
       # Strip leading a trailing spaces.
