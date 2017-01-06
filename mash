@@ -256,7 +256,7 @@ class Frame:
       # Fix the indentation of the text.
       match = re.search(r"^unindent", command)
       if match:
-        print "   removing (%s)" % self.indent
+        print "   removing %s spaces from the start of each line" % self.indent
         self.text = re.sub("\n {%d}" % self.indent, "\n", self.text)
         continue
 
