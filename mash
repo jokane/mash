@@ -18,12 +18,6 @@ import shutil
 import difflib
 import glob
 
-def announce_file_in(fname):
-  print >>sys.stderr, "-->", fname
-
-def announce_file_out(fname):
-  print >>sys.stderr, "<--", fname
-
 class Frame:
   def __init__(self, _parent, _commands, _indent):
     # Remember our parent.
@@ -169,7 +163,6 @@ class Frame:
         if not exists_already:
           if mash.args.diff:
             print ''.join(difflib.unified_diff(existing_contents.splitlines(1), self.text.splitlines(1)))
-          announce_file_out(target)
           f = open(target, 'w')
           print >>f, self.text,
           f.close()
@@ -368,12 +361,10 @@ class Mash:
       sys.exit(1)
 
     if not os.path.exists(self.args.output_directory):
-      announce_file_out(self.args.output_directory) 
       os.makedirs(self.args.output_directory)
 
     self.original_directory = os.getcwd()
 
-    announce_file_in(self.args.input_filename)
     text = open(self.args.input_filename, 'r').read()
 
     os.chdir(self.args.output_directory)
