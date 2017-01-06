@@ -57,6 +57,7 @@
       [[[unindent; filter python; strip; push
         a = 0
         b = 1
+
         for i in range(1, 10):
           c = a + b
           a = b
@@ -77,6 +78,28 @@
     \section{Include Files}
     [[[include included.mash]]]
 
+
+    \section{Named chunks}
+
+      [[[unindent; filter python; store chunk ([A-Z]*) \(\((.*)\)\); clear; push
+        import math
+        print "chunk A (( The square root of 2 is %f. ))" % math.sqrt(2)
+        print "chunk B (( The square root of 3 is %f. ))" % math.sqrt(3)
+        print "chunk C (( The square root of 4 is %f. ))" % math.sqrt(4)
+      ]]]
+
+      Here's a simple fact:
+      \begin{center}
+        [[[chunk A; push]]]
+      \end{center}
+      This is also true:
+      \begin{center}
+        [[[chunk C; push]]]
+      \end{center}
+      And this:
+      \begin{center}
+        [[[chunk B; push]]]
+      \end{center}
 
     \section{Citations}
     [[[@bibentry
@@ -105,22 +128,6 @@
     \bibliographystyle{plain}
     \bibliography{test}
 
-    \section{Named chunks}
-
-      [[[unindent; filter python; store chunk ([A-Z]*) \(\((.*)\)\); clear; push
-        print "chunk A (( The square root of 2 is " + sqrt(2) + ". ))"
-        print "chunk B (( The square root of 3 is " + sqrt(3) + ". ))"
-      ]]]
-
-      Chunk A looks like this:
-      \begin{center}
-        [[[chunk A; push]]]
-      \end{center}
-
-      Chunk B looks like this:
-      \begin{center}
-        [[[chunk B; push]]]
-      \end{center}
 
 
   \end{document}

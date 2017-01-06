@@ -252,7 +252,8 @@ class Frame:
       # Fix the indentation of the text.
       match = re.search(r"^unindent", command)
       if match:
-        self.text = re.sub("\n\s{%d}" % self.indent, "\n", self.text)
+        print "   removing (%s)" % self.indent
+        self.text = re.sub("\n {%d}" % self.indent, "\n", self.text)
         continue
 
       # Clear the current text.
