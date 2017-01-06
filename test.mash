@@ -73,6 +73,7 @@
       print "$$"
     ]]]
 
+
     \section{Include Files}
     [[[include included.mash]]]
 
@@ -103,6 +104,24 @@
 
     \bibliographystyle{plain}
     \bibliography{test}
+
+    \section{Named chunks}
+
+      [[[unindent; filter python; store chunk ([A-Z]*) \(\((.*)\)\); clear; push
+        print "chunk A (( The square root of 2 is " + sqrt(2) + ". ))"
+        print "chunk B (( The square root of 3 is " + sqrt(3) + ". ))"
+      ]]]
+
+      Chunk A looks like this:
+      \begin{center}
+        [[[chunk A; push]]]
+      \end{center}
+
+      Chunk B looks like this:
+      \begin{center}
+        [[[chunk B; push]]]
+      \end{center}
+
 
   \end{document}
 

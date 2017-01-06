@@ -55,6 +55,10 @@ class Frame:
     # parent frames, if it cannot find a definition at this level.
     self.macros = dict()
 
+    # A dictionary of text chunks, for spreading the output of a program across
+    # several places.  Used by the store, lookup, and push commands.
+    self.chunks = dict()
+
   def append_text(self, new_text):
     self.text += new_text
 
@@ -72,12 +76,20 @@ class Frame:
     else:
       # No definition for this macro at this level.  Maybe our parent knows it?
       return self.parent.resolve_macro(name, args_list)
-
+  
+  def resolve_chunk(self, key):
+    try:
+      x = self.chunks[key]
+      print "found it!", x
+      return x
+    except KeyError:
+      return self.parent.resolve_chunk(key)
 
   def execute(self, mash):
     # Called when this frame's command and text have been fully read from the
     # input file.  Executes the commands.
     print "[[[%s]]]" % self.commands
+    mash.frame_count += 1
 
     # Are there any commands?  If not, ingore this frame.  Not sure why this
     # would happen except at the very top level, or for frames that contain
@@ -99,12 +111,13 @@ class Frame:
 
     # Split the command list into individual commands.
     command_list = self.commands.split(';')
-    
+
     # Loop through the commands we have.
     while command_list:
       command = command_list[0]
       command_list = command_list[1:]
       command = command.strip()
+      mash.command_count += 1
 
       # Replace things like $1 with anonymous names based on hashing the text.
       command = re.sub(r'\$(\d+)', lambda m: self.make_name(m.group(1)), command)
@@ -226,11 +239,12 @@ class Frame:
         self.text = self.text.strip()
         continue
 
-      # Push our text and macros up into the parent frame.
+      # Push our text, macros, and chunks up into the parent frame.
       match = re.search(r"^push", command)
       if match:
         self.parent.append_text(self.text)
         self.parent.macros.update(self.macros)
+        self.parent.chunks.update(self.chunks)
         continue
 
       # Fix the indentation of the text.
@@ -244,7 +258,6 @@ class Frame:
       if match:
         self.text = ""
         continue
-
 
       # Include another mash file.
       match = re.search(r"^include (.*)", command)
@@ -282,18 +295,41 @@ class Frame:
           self.dirty = True
 
         continue
-
-      # Other commands that might make sense:
-      # - promote (append the text of the current frame to the text of the parent frame)
       
-      # ?
+      # store: Scan the text for named chunks, using the given pattern.  Store
+      # them for later in our chunks dictionary.
+      match = re.search(r"^store (.*)", command)
+      if match:
+        pattern = match.group(1)
+
+        def store_chunk(m):
+          key = m.group(1)
+          value = m.group(2)
+          print "   chunk", key
+          print "before:", self.chunks
+          self.chunks[key] = value
+          print "after:", self.chunks
+        re.sub(pattern, store_chunk, self.text, re.DOTALL)
+
+        continue
+
+      # chunk: Append a named chunk to the text.
+      match = re.search(r"^chunk (.*)", command)
+      if match:
+        key = match.group(1)
+        self.append_text(self.resolve_chunk(key))
+        continue
+  
+      # Couldn't make any sense of this command.
       raise Exception("Unknown command: %s" % command)
+
 
     # All done executing commands.  Last step: If we're dirty, then our parent
     # should be dirty too.
     if self.dirty:
       #print "Marking parent frame dirty."
       self.parent.dirty = True
+
     
     # Done!
     return
@@ -333,7 +369,12 @@ class Mash:
     text = open(self.args.input_filename, 'r').read()
 
     os.chdir(self.args.output_directory)
+    
+    self.frame_count = 0
+    self.command_count = 0
+
     self.mash_string(text, Frame(None, "", 0))
+    print "%d commands in %d frames" % (self.command_count, self.frame_count)
 
   def mash_string(self, text, top_frame):
     # The current frame for whatever we're parsing now.  This top one has no
