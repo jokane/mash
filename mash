@@ -74,7 +74,6 @@ class Frame:
   def resolve_chunk(self, key):
     try:
       x = self.chunks[key]
-      print "found it!", x
       return x
     except KeyError:
       try:
@@ -301,16 +300,12 @@ class Frame:
       match = re.search(r"^store (.*)", command)
       if match:
         pattern = match.group(1)
-        print "pattern", pattern
-        print "text", self.text
 
         def store_chunk(m):
           key = m.group(1)
           value = m.group(2)
           print "   chunk", key
-          print "before:", self.chunks
           self.chunks[key] = value
-          print "after:", self.chunks
         re.sub(pattern, store_chunk, self.text, flags=re.DOTALL)
 
         continue
@@ -329,7 +324,6 @@ class Frame:
     # All done executing commands.  Last step: If we're dirty, then our parent
     # should be dirty too.
     if self.dirty:
-      #print "Marking parent frame dirty."
       self.parent.dirty = True
 
     
