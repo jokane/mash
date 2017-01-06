@@ -83,7 +83,10 @@ class Frame:
       print "found it!", x
       return x
     except KeyError:
-      return self.parent.resolve_chunk(key)
+      try:
+        return self.parent.resolve_chunk(key)
+      except AttributeError:
+        raise Exception("Chunk '%s' not found." % key)
 
   def execute(self, mash):
     # Called when this frame's command and text have been fully read from the
@@ -164,7 +167,8 @@ class Frame:
           exists_already = False
 
         if not exists_already:
-          print ''.join(difflib.unified_diff(existing_contents.splitlines(1), self.text.splitlines(1)))
+          if mash.args.diff:
+            print ''.join(difflib.unified_diff(existing_contents.splitlines(1), self.text.splitlines(1)))
           announce_file_out(target)
           f = open(target, 'w')
           print >>f, self.text,
@@ -304,6 +308,7 @@ class Frame:
       match = re.search(r"^store (.*)", command)
       if match:
         pattern = match.group(1)
+        print self.text
 
         def store_chunk(m):
           key = m.group(1)
@@ -347,7 +352,7 @@ class Mash:
     # This is the 'main' function.
     parser = argparse.ArgumentParser()
     parser.add_argument(dest='input_filename', help='input filename', nargs='?')
-    parser.add_argument('--debug', '-d', dest='debug', help='show debugging information', action='store_true')
+    parser.add_argument('--diff', '-d', dest='diff', help='show differences in saved files', action='store_true')
     parser.add_argument('--output_directory', '-o', dest='output_directory', help='directory for output files', default=os.path.join(os.getcwd(), '.mash'))
     parser.add_argument('--clean', '-c', dest='clean', action='store_true')
     self.args = parser.parse_args()
@@ -376,8 +381,13 @@ class Mash:
     self.frame_count = 0
     self.command_count = 0
 
-    self.mash_string(text, Frame(None, "", 0))
-    print "%d commands in %d frames" % (self.command_count, self.frame_count)
+    try:
+      self.mash_string(text, Frame(None, "", 0))
+      print "%d commands in %d frames" % (self.command_count, self.frame_count)
+    except Exception as e:
+      print "Error:", e
+      sys.exit(1)
+
 
   def mash_string(self, text, top_frame):
     # The current frame for whatever we're parsing now.  This top one has no
