@@ -81,7 +81,7 @@
 
     \section{Named chunks}
 
-      [[[unindent; filter python; store chunk ([A-Z]*) \(\((.*)\)\); clear; push
+      [[[unindent; filter python; store chunk ([a-zA-Z0-9]*) \(\((.*?)\)\); clear; push
         import math
         print "chunk A (( The square root of 2 is %f. ))" % math.sqrt(2)
         print "chunk B (( The square root of 3 is %f. ))" % math.sqrt(3)
