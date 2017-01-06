@@ -301,7 +301,8 @@ class Frame:
       match = re.search(r"^store (.*)", command)
       if match:
         pattern = match.group(1)
-        print self.text
+        print "pattern", pattern
+        print "text", self.text
 
         def store_chunk(m):
           key = m.group(1)
@@ -310,7 +311,7 @@ class Frame:
           print "before:", self.chunks
           self.chunks[key] = value
           print "after:", self.chunks
-        re.sub(pattern, store_chunk, self.text, re.DOTALL)
+        re.sub(pattern, store_chunk, self.text, flags=re.DOTALL)
 
         continue
 
