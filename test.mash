@@ -128,6 +128,21 @@
     \bibliographystyle{plain}
     \bibliography{test}
 
+    \section{Dependencies}
+    [[[unindent; save a.py
+      import time
+      def func(x):
+        return 2*x
+    ]]]
+
+    Sometimes you'll need to declare dependencies explicitly.  This Python code
+    depends on module a, create above, but \texttt{mash} doesn't know that
+    without a depend command.
+    [[[unindent; save $1.py; depend $1.txt: a.py; !exec python $1.py > $1.txt; clear; read $1.txt; push
+      import a
+      import time
+      print a.func(10)
+    ]]]
 
 
   \end{document}

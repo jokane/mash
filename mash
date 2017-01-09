@@ -17,6 +17,7 @@ import subprocess
 import shutil
 import difflib
 import glob
+import time
 
 class Frame:
   def __init__(self, _parent, _commands, _indent):
@@ -77,7 +78,6 @@ class Frame:
       return x
     except KeyError:
       try:
-        print self.chunks
         return self.parent.resolve_chunk(key)
       except AttributeError:
         raise Exception("Chunk '%s' not found." % key)
@@ -167,8 +167,10 @@ class Frame:
           print >>f, self.text,
           f.close()
           self.dirty = True
+          print "   (writing; frame is dirty)"
+          time.sleep(0.1)
         else:
-          print "    (no change)"
+          print "   (no change)"
 
         continue
 
@@ -209,6 +211,33 @@ class Frame:
           f = open(filename, 'r')
           self.append_text(f.read())
           f.close()
+        continue
+
+      # Depend: Mark the frame dirty certain files are newer than other files.
+      match = re.search(r"^depend (.*)", command)
+      if match:
+        (target_spec, dep_spec) = match.group(1).split(":")
+        print "  targets:", target_spec.strip()
+        print "  deps:", dep_spec.strip()
+        for target in target_spec.split(' '):
+          for dep in dep_spec.split(' '):
+            if not target: continue
+            if not dep: continue
+            if os.path.isfile(target):
+              target_time = os.path.getmtime(target)
+            else:
+              target_time = 0
+            if os.path.isfile(dep):
+              dep_time = os.path.getmtime(dep)
+            else:
+              dep_time = 0
+            print "   Modification time for", target, "is", target_time
+            print "   Modification time for", dep, "is", dep_time
+            if target_time > dep_time:
+              print 'target is newer'
+            else:
+              print 'dep is newer'
+              self.dirty = True
         continue
 
       # Execute a shell command, allowing its output to go to the terminal in
@@ -306,7 +335,10 @@ class Frame:
 
         def store_chunk(m):
           key = m.group(1)
-          value = m.group(2)
+          try:
+            value = m.group(2)
+          except IndexError:
+            raise Exception("Invalid store pattern '%s'.  Needs a second group." % pattern)
           print "   chunk", key
           self.chunks[key] = value
 
