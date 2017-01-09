@@ -17,7 +17,6 @@ import subprocess
 import shutil
 import difflib
 import glob
-import time
 
 class Frame:
   def __init__(self, _parent, _commands, _indent):
@@ -167,8 +166,8 @@ class Frame:
           print >>f, self.text,
           f.close()
           self.dirty = True
+          mash.written[target] = True
           print "   (writing; frame is dirty)"
-          time.sleep(0.1)
         else:
           print "   (no change)"
 
@@ -213,31 +212,18 @@ class Frame:
           f.close()
         continue
 
-      # Depend: Mark the frame dirty certain files are newer than other files.
+      # Depend: Mark the frame dirty if given other files have been written
+      # elsewhere.
       match = re.search(r"^depend (.*)", command)
       if match:
-        (target_spec, dep_spec) = match.group(1).split(":")
-        print "  targets:", target_spec.strip()
-        print "  deps:", dep_spec.strip()
-        for target in target_spec.split(' '):
-          for dep in dep_spec.split(' '):
-            if not target: continue
-            if not dep: continue
-            if os.path.isfile(target):
-              target_time = os.path.getmtime(target)
-            else:
-              target_time = 0
-            if os.path.isfile(dep):
-              dep_time = os.path.getmtime(dep)
-            else:
-              dep_time = 0
-            print "   Modification time for", target, "is", target_time
-            print "   Modification time for", dep, "is", dep_time
-            if target_time > dep_time:
-              print 'target is newer'
-            else:
-              print 'dep is newer'
-              self.dirty = True
+        deps = match.group(1).strip()
+        for dep in deps.split(' '):
+          dep = dep.strip()
+          if dep in mash.written:
+            print "   (dep has changed; frame is dirty)"
+            self.dirty = True
+          else:
+            print "    (no change)"
         continue
 
       # Execute a shell command, allowing its output to go to the terminal in
@@ -409,6 +395,8 @@ class Mash:
     
     self.frame_count = 0
     self.command_count = 0
+
+    self.written = dict()
 
     if self.args.debug:
       self.mash_string(text, Frame(None, "", 0))
