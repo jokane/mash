@@ -155,11 +155,31 @@
 
   \begin{document}
 
-    \section{Introduction}
     Mash is a tool for manipulating small snippets of text.  A mash document
     consists of one or more \emph{frames}, which may be nested within each
     other.  Each frame has a list of zero or more \emph{commands} along with a
     block of \emph{text} on which those commands operate.
+
+    \begin{enumerate}
+      \item \texttt{\@}
+      \item \texttt{chunk}
+      \item \texttt{clear}
+      \item \texttt{def}
+      \item \texttt{depend}
+      \item \texttt{emit}
+      \item \texttt{exec}
+      \item \texttt{filter}
+      \item \texttt{import}
+      \item \texttt{include}
+      \item \texttt{keep}
+      \item \texttt{print}
+      \item \texttt{push}
+      \item \texttt{read}
+      \item \texttt{save}
+      \item \texttt{store}
+      \item \texttt{strip}
+      \item \texttt{unindent}
+    \end{enumerate}
    
   \end{document}
 
