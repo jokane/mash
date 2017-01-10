@@ -226,6 +226,14 @@ class Frame:
             print "    (no change)"
         continue
 
+      # emit: Note that a given file is being written (for example as an effect
+      # of an exec command) so that we can have dependencies on it later.
+      match = re.search(r"^emit (.*)", command)
+      if match:
+        file_to_emit = match.group(1)
+        mash.written[file_to_emit] = True
+        continue
+
       # Execute a shell command, allowing its output to go to the terminal in
       # which mash is running, and without changing the text.  Complain if the
       # command returns a non-zero (error) return code.
