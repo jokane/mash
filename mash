@@ -332,6 +332,11 @@ class Frame:
         self.append_text(self.resolve_chunk(key))
         #print "chunk(%s)=(%s)" % (key, self.resolve_chunk(key))
         continue
+
+      # quit: Ignore the rest of the commands in this frame.
+      match = re.search(r"^quit", command)
+      if match:
+        break
   
       # Couldn't make any sense of this command.
       raise Exception("Unknown command: %s" % command)
