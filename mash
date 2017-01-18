@@ -499,7 +499,7 @@ class Mash:
 
     os.chdir(self.args.build_directory)
     
-    self.frame_count = 0
+    self.frame_count = 1
     self.command_count = 0
 
     self.written = dict()
