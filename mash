@@ -53,6 +53,16 @@ class Frame:
     # several places.  Used by the store, lookup, and push commands.
     self.chunks = dict()
 
+    if self.parent:
+      self.parent.show('* ' + self.commands)
+      self.pp = self.parent.pp + '    '
+    else:
+      self.pp = ''
+
+
+  def show(self, txt):
+    print self.pp + str(txt)
+
   def append_text(self, new_text):
     self.text += new_text
 
@@ -96,7 +106,6 @@ class Frame:
   def execute(self, mash):
     # Called when this frame's command and text have been fully read from the
     # input file.  Executes the commands.
-    print "[[[%s]]]" % self.commands
     mash.frame_count += 1
 
     # Are there any commands?  If not, ingore this frame.  Not sure why this
@@ -129,7 +138,7 @@ class Frame:
 
       # Replace things like $1 with anonymous names based on hashing the text.
       command = re.sub(r'\$(\d+)', lambda m: self.make_name(m.group(1)), command)
-      print " ", command
+      self.show(command)
 
       # Commands that start with ! are "build" commands, which we should only
       # execute if we are a 'dirty' frame: If something has changed.
@@ -139,7 +148,7 @@ class Frame:
         command = match.group(1)
       if match and not self.dirty:
         # No need to build.  Skip to the next thing.
-        print "    (skipped)"
+        self.show("  (skipped)")
         continue
 
       # Save text to a file.
@@ -159,15 +168,17 @@ class Frame:
 
         if not exists_already:
           if mash.args.diff:
-            print ''.join(difflib.unified_diff(existing_contents.splitlines(1), self.text.splitlines(1)))
+            pass
+            self.show('  ' + ''.join(difflib.unified_diff(existing_contents.splitlines(1), self.text.splitlines(1))))
           f = open(target, 'w')
           print >>f, self.text,
           f.close()
           self.dirty = True
           mash.written[target] = True
-          print "   (writing; frame is dirty)"
+          self.show("  (writing; frame is dirty)")
         else:
-          print "   (no change)"
+          self.show("   (no change)")
+          pass
         mash.touched[target] = True
 
         continue
@@ -184,7 +195,7 @@ class Frame:
       match = re.search(r"^read +(.*)", command)
       if match:
         for filename in glob.glob(match.group(1)):
-          print "    ", filename
+          self.show("  " + filename)
           f = open(filename, 'r')
           self.append_text(f.read())
           f.close()
@@ -195,9 +206,9 @@ class Frame:
       if match:
         for filename in glob.glob(match.group(1)):
           if filename in mash.touched:
-            print "    ", filename, " (touched; leaving alone)"
+            self.show("  " + filename + " (touched; leaving alone)")
           else:
-            print "    ", filename, " (not touched; removing)"
+            self.show("  " + filename + " (not touched; removing)")
             os.remove(filename)
 
         continue
@@ -210,10 +221,10 @@ class Frame:
         for dep in deps.split(' '):
           dep = dep.strip()
           if dep in mash.written:
-            print "   (dep has changed; frame is dirty)"
+            self.show("  (dep has changed; frame is dirty)")
             self.dirty = True
           else:
-            print "    (no change)"
+            self.show("  (no change)")
         continue
 
       # emit: Note that a given file is being written (for example as an effect
@@ -270,7 +281,7 @@ class Frame:
       # Fix the indentation of the text.
       match = re.search(r"^unindent", command)
       if match:
-        print "   removing %s spaces from the start of each line" % self.indent
+        self.show("  unindenting by %s spaces" % self.indent)
         self.text = re.sub("\n {%d}" % self.indent, "\n", self.text)
         continue
 
@@ -317,14 +328,10 @@ class Frame:
         # Does this file exist already?
         if os.path.isfile(to) and filecmp.cmp(fr, to, False):
           # Yes.  Nothing to do.
-          print "    (no change)"
-          pass
+          self.show("  (no change)")
         else:
           # No.  Copy it in and set the dirty flag.
-          print "    (importing)"
-          print os.getcwd()
-          print fr
-          print to
+          self.show("  (importing)")
           shutil.copyfile(fr, to)
           self.dirty = True
 
@@ -344,7 +351,7 @@ class Frame:
             value = m.group(2)
           except IndexError:
             raise Exception("Invalid store pattern '%s'.  Needs a second group." % pattern)
-          print "   chunk", key
+          self.show("  chunk " + key)
           self.chunks[key] = value
 
         re.sub(pattern, store_chunk, self.text, flags=re.DOTALL)
@@ -362,7 +369,6 @@ class Frame:
       if match:
         key = match.group(1)
         self.append_text(self.resolve_chunk(key))
-        #print "chunk(%s)=(%s)" % (key, self.resolve_chunk(key))
         continue
 
       # quit: Ignore the rest of the commands in this frame.
@@ -377,6 +383,7 @@ class Frame:
         macro_args = match.group(2).split(',')
         expansion = self.resolve_macro(macro_name, macro_args)
         if expansion:
+          self.show("  expanding macro to:" + ";".join(expansion))
           command_list = self.resolve_macro(macro_name, macro_args) + command_list
           continue
         else:
@@ -392,7 +399,6 @@ class Frame:
     # should be dirty too.
     if self.dirty:
       self.parent.dirty = True
-
     
     # Done!
     return
