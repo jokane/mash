@@ -168,6 +168,7 @@ class Frame:
           print "   (writing; frame is dirty)"
         else:
           print "   (no change)"
+        mash.touched[target] = True
 
         continue
       
@@ -187,6 +188,18 @@ class Frame:
           f = open(filename, 'r')
           self.append_text(f.read())
           f.close()
+        continue
+
+      # purge: Remove files, unless they've been touched by a previous command.
+      match = re.search(r"^purge +(.*)", command)
+      if match:
+        for filename in glob.glob(match.group(1)):
+          if filename in mash.touched:
+            print "    ", filename, " (touched; leaving alone)"
+          else:
+            print "    ", filename, " (not touched; removing)"
+            os.remove(filename)
+
         continue
 
       # Depend: Mark the frame dirty if given other files have been written
@@ -209,6 +222,7 @@ class Frame:
       if match:
         file_to_emit = match.group(1)
         mash.written[file_to_emit] = True
+        mash.touched[file_to_emit] = True
         continue
 
       # Execute a shell command, allowing its output to go to the terminal in
@@ -220,6 +234,13 @@ class Frame:
         return_code = os.system(shell_command)
         if return_code != 0:
           raise Exception("Shell command '%s' failed with return code %d." % (shell_command, return_code))
+        continue
+
+      # Change the directory for kept files.
+      match = re.search(r"^keepdir +(.*)", command)
+      if match:
+        mash.args.keep_directory = match.group(1)
+        mash.args.keep_directory = mash.fix_path(mash.args.keep_directory)
         continue
 
       # Filter the text through a shell command.
@@ -476,6 +497,7 @@ class Mash:
     self.command_count = 0
 
     self.written = dict()
+    self.touched = dict()
 
     if self.args.debug:
       self.mash_string(text, Frame(None, "", 0))
@@ -487,7 +509,6 @@ class Mash:
         sys.exit(1)
 
     print "%d commands in %d frames" % (self.command_count, self.frame_count)
-
 
 
 if __name__ == '__main__':
