@@ -64,12 +64,24 @@ class Frame:
   def resolve_macro(self, name, args_list):
     if name in self.macros:
       commands = self.macros[name]
-      commands = re.sub(r'#(\d+)', lambda m: args_list[int(m.group(1))-1], commands)
+      def resolve_arg(m):
+        arg_num = int(m.group(1))-1
+        try:
+          arg = args_list[arg_num]
+        except IndexError:
+          raise Exception("Definition of macro %s uses #%d, but only %d arguments were given." % (name, arg_num+1, len(args_list)))
+        return arg
+
+      commands = re.sub(r'#(\d+)', resolve_arg, commands)
       return commands.split(';')
 
-    else:
+    elif self.parent:
       # No definition for this macro at this level.  Maybe our parent knows it?
       return self.parent.resolve_macro(name, args_list)
+
+    else:
+      # No definition at this level, and no parent to ask.  Give up.
+      return None
   
   def resolve_chunk(self, key):
     try:
@@ -128,20 +140,6 @@ class Frame:
       if match and not self.dirty:
         # No need to build.  Skip to the next thing.
         print "    (skipped)"
-        continue
-
-      # Is it a macro to expand?
-      match = re.search(r"^@([a-zA-Z0-9_-]+)\((.*)\)", command)
-      if match:
-        macro_name = match.group(1)
-        macro_args = match.group(2).split(',')
-        command_list = self.resolve_macro(macro_name, macro_args) + command_list
-        continue
-      match = re.search(r"^@([a-zA-Z0-9]+)", command)
-      if match:
-        macro_name = match.group(1)
-        macro_args = list()
-        command_list = self.resolve_macro(macro_name, macro_args) + command_list
         continue
 
       # Save text to a file.
@@ -269,7 +267,17 @@ class Frame:
         mash.mash_string(include_text, self)
         self.parent.append_text(self.text)
         self.parent.macros.update(self.macros)
+        self.parent.chunks.update(self.chunks)
         continue
+
+      # Process our text as mash code.  Not needed for code literally in the
+      # source file, but if some previous commands have turned the text into
+      # mash code...
+      match = re.search(r"^mash", command)
+      if match:
+        mash.mash_string(self.text, self)
+        continue
+
 
       # Keep a file by copying it to the input directory.
       match = re.search(r"^keep +(.*)", command)
@@ -337,9 +345,23 @@ class Frame:
       match = re.search(r"^quit", command)
       if match:
         break
-  
+
+      # Last change: Is it a macro to expand?
+      match = re.search(r"([a-zA-Z0-9_-]+) *(.*)", command)
+      if match:
+        macro_name = match.group(1)
+        macro_args = match.group(2).split(',')
+        expansion = self.resolve_macro(macro_name, macro_args)
+        if expansion:
+          command_list = self.resolve_macro(macro_name, macro_args) + command_list
+          continue
+        else:
+          # No definition for this macro.
+          pass
+
       # Couldn't make any sense of this command.
       raise Exception("Unknown command: %s" % command)
+  
 
 
     # All done executing commands.  Last step: If we're dirty, then our parent
