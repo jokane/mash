@@ -161,7 +161,6 @@
     block of \emph{text} on which those commands operate.
 
     \begin{enumerate}
-      \item \texttt{\@}
       \item \texttt{chunk}
       \item \texttt{clear}
       \item \texttt{def}

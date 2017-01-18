@@ -26,9 +26,9 @@ class Frame:
     # Keep the list of commands.
     self.commands = _commands 
 
-    # How much indent do we have on the first line?  This will be removed from
-    # each line before processing anything.  Important if the test is python
-    # code.
+    # How much indent do we have on the first line?  The unindent command will
+    # remove this much from each line before processing anything.  Important if
+    # the text is python code.
     self.indent = _indent
 
     # Start with no text.  We'll probably get more later from
@@ -283,7 +283,7 @@ class Frame:
       match = re.search(r"^keep +(.*)", command)
       if match:
         file_to_keep = match.group(1)
-        shutil.copy(file_to_keep, mash.original_directory)
+        shutil.copy(file_to_keep, mash.args.keep_directory)
         continue
 
       # Import a file from the input directory into the build directory.
@@ -291,7 +291,7 @@ class Frame:
       if match:
         file_to_import = match.group(1)
         fr = os.path.join(mash.original_directory, file_to_import)
-        to = os.path.join(mash.args.output_directory, file_to_import)
+        to = os.path.join(mash.args.build_directory, file_to_import)
 
         # Does this file exist already?
         if os.path.isfile(to) and filecmp.cmp(fr, to, False):
@@ -301,6 +301,9 @@ class Frame:
         else:
           # No.  Copy it in and set the dirty flag.
           print "    (importing)"
+          print os.getcwd()
+          print fr
+          print to
           shutil.copyfile(fr, to)
           self.dirty = True
 
@@ -379,51 +382,6 @@ class Frame:
 
 
 class Mash:
-  def engage(self):
-    # This is the 'main' function.
-    parser = argparse.ArgumentParser()
-    parser.add_argument(dest='input_filename', help='input filename', nargs='?')
-    parser.add_argument('--diff', '-d', dest='diff', help='show differences in saved files', action='store_true')
-    parser.add_argument('--debug', dest='debug', help='on error, show stack trace', action='store_true')
-    parser.add_argument('--output_directory', '-o', dest='output_directory', help='directory for output files', default=os.path.join(os.getcwd(), '.mash'))
-    parser.add_argument('--clean', '-c', dest='clean', action='store_true')
-    self.args = parser.parse_args()
-
-    if self.args.clean:
-      if os.path.exists(self.args.output_directory):
-        shutil.rmtree(self.args.output_directory)
-      if self.args.input_filename is None:
-        return
-
-    if self.args.input_filename is None:
-      parser.print_help()
-      sys.exit(1)
-
-    if not os.path.exists(self.args.output_directory):
-      os.makedirs(self.args.output_directory)
-
-    self.original_directory = os.getcwd()
-
-    text = open(self.args.input_filename, 'r').read()
-
-    os.chdir(self.args.output_directory)
-    
-    self.frame_count = 0
-    self.command_count = 0
-
-    self.written = dict()
-
-    if self.args.debug:
-      self.mash_string(text, Frame(None, "", 0))
-    else:
-      try:
-        self.mash_string(text, Frame(None, "", 0))
-      except Exception as e:
-        print "Error:", e
-        sys.exit(1)
-
-    print "%d commands in %d frames" % (self.command_count, self.frame_count)
-
 
   def mash_string(self, text, top_frame):
     # The current frame for whatever we're parsing now.  This top one has no
@@ -473,6 +431,63 @@ class Mash:
       current_frame.append_text(match.group(0))
       eaten = match.group(1)
       text = text[len(eaten):]
+
+  def fix_path(self, path):
+    # Make sure the given path is absolute, and that it exists.
+    if not os.path.isabs(path):
+      path = os.path.join(self.original_directory, path)
+
+    if not os.path.exists(path):
+      os.makedirs(path)
+    return path
+    
+
+  def engage(self):
+    # This is the 'main' function.
+    parser = argparse.ArgumentParser()
+    parser.add_argument(dest='input_filename', help='input filename', nargs='?')
+    parser.add_argument('--diff', dest='diff', help='show differences in saved files', action='store_true')
+    parser.add_argument('--debug', '-d', dest='debug', help='on error, show stack trace', action='store_true')
+    parser.add_argument('--build_directory', '-b', dest='build_directory', help='directory for working files', default='.mash')
+    parser.add_argument('--keep_directory', '-k', dest='keep_directory', help='directory for kept files', default='.')
+    parser.add_argument('--clean', '-c', dest='clean', action='store_true')
+    self.args = parser.parse_args()
+
+    if self.args.clean:
+      if os.path.exists(self.args.build_directory):
+        shutil.rmtree(self.args.build_directory)
+      if self.args.input_filename is None:
+        return
+
+    if self.args.input_filename is None:
+      parser.print_help()
+      sys.exit(1)
+
+    self.original_directory = os.getcwd()
+
+    self.args.keep_directory = self.fix_path(self.args.keep_directory)
+    self.args.build_directory = self.fix_path(self.args.build_directory)
+
+    text = open(self.args.input_filename, 'r').read()
+
+    os.chdir(self.args.build_directory)
+    
+    self.frame_count = 0
+    self.command_count = 0
+
+    self.written = dict()
+
+    if self.args.debug:
+      self.mash_string(text, Frame(None, "", 0))
+    else:
+      try:
+        self.mash_string(text, Frame(None, "", 0))
+      except Exception as e:
+        print "Error:", e
+        sys.exit(1)
+
+    print "%d commands in %d frames" % (self.command_count, self.frame_count)
+
 
 
 if __name__ == '__main__':
