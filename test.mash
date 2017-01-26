@@ -130,7 +130,6 @@
 
     \section{Dependencies}
     [[[unindent; save a.py
-      import time
       def func(x):
         return 4*x
     ]]]
@@ -141,7 +140,6 @@
     Python snippet will be re-run:
     [[[unindent; save $1.py; depend a.py; !exec python $1.py > $1.txt; clear; read $1.txt; push
       import a
-      import time
       print a.func(10)
     ]]]
 
