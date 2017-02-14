@@ -324,7 +324,7 @@ class Frame:
       if match:
         file_to_import = match.group(1)
         fr = os.path.join(mash.original_directory, file_to_import)
-        to = os.path.join(mash.args.build_directory, file_to_import)
+        to = os.path.join(mash.args.build_directory, os.path.basename(file_to_import))
 
         # Does this file exist already?
         if os.path.isfile(to) and filecmp.cmp(fr, to, False):
