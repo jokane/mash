@@ -232,9 +232,11 @@ class Frame:
       # of an exec command) so that we can have dependencies on it later.
       match = re.search(r"^emit +(.*)", command)
       if match:
-        file_to_emit = match.group(1)
-        mash.written[file_to_emit] = True
-        mash.touched[file_to_emit] = True
+        files_to_emit = match.group(1).strip()
+        for file_to_emit in files_to_emit.split(' '):
+          file_to_emit = file_to_emit.strip()
+          mash.written[file_to_emit] = True
+          mash.touched[file_to_emit] = True
         continue
 
       # Execute a shell command, allowing its output to go to the terminal in
@@ -357,11 +359,11 @@ class Frame:
 
         re.sub(pattern, store_chunk, self.text, flags=re.DOTALL)
 
-        number_of_chunks_after = len(self.chunks)
-        difference = number_of_chunks_after - number_of_chunks_before
+        ## number_of_chunks_after = len(self.chunks)
+        ## difference = number_of_chunks_after - number_of_chunks_before
 
-        if difference == 0:
-          raise Exception("No new chunks found for pattern '%s' in this text:\n%s" % (pattern, self.text))
+        ## if difference == 0:
+        ##   raise Exception("No new chunks found for pattern '%s' in this text:\n%s" % (pattern, self.text))
 
         continue
 
