@@ -332,19 +332,20 @@ class Frame:
       # Import a file from the input directory into the build directory.
       match = re.search(r"^import +(.*)", command)
       if match:
-        file_to_import = match.group(1)
-        fr = os.path.join(mash.original_directory, file_to_import)
-        to = os.path.join(mash.args.build_directory, os.path.basename(file_to_import))
+        for file_to_import in glob.glob(os.path.join(mash.original_directory, match.group(1))):
+          self.show("import? " + file_to_import)
+          fr = file_to_import
+          to = os.path.join(mash.args.build_directory, os.path.basename(file_to_import))
 
-        # Does this file exist already?
-        if os.path.isfile(to) and filecmp.cmp(fr, to, False):
-          # Yes.  Nothing to do.
-          self.show("  (no change)")
-        else:
-          # No.  Copy it in and set the dirty flag.
-          self.show("  (importing)")
-          shutil.copyfile(fr, to)
-          self.dirty = True
+          # Does this file exist already?
+          if os.path.isfile(to) and filecmp.cmp(fr, to, False):
+            # Yes.  Nothing to do.
+            self.show("  %s (no change)" % file_to_import)
+          else:
+            # No.  Copy it in and set the dirty flag.
+            self.show("  %s (importing)" % file_to_import)
+            shutil.copyfile(fr, to)
+            self.dirty = True
 
         continue
       
