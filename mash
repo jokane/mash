@@ -318,7 +318,12 @@ class Frame:
       match = re.search(r"^keep +(.*)", command)
       if match:
         file_to_keep = match.group(1)
-        shutil.copy(file_to_keep, mash.args.keep_directory)
+        if os.path.isfile(file_to_keep):
+          shutil.copy(file_to_keep, mash.args.keep_directory)
+        elif os.path.isdir(file_to_keep):
+          shutil.copytree(file_to_keep, os.path.join(mash.args.keep_directory, file_to_keep))
+        else:
+          raise Exception("Don't know how to keep %s, which is niether file nor directory." % file_to_keep)
         continue
 
       # Import a file from the input directory into the build directory.
