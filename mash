@@ -332,8 +332,12 @@ class Frame:
       # Import a file from the input directory into the build directory.
       match = re.search(r"^import +(.*)", command)
       if match:
-        for file_to_import in glob.glob(os.path.join(mash.original_directory, match.group(1))):
-          self.show("import? " + file_to_import)
+        pattern = match.group(1)
+        globs = glob.glob(os.path.join(mash.original_directory,pattern))
+        if not globs:
+          raise Exception("Trying to import %s, but no files match." % pattern)
+
+        for file_to_import in globs:
           fr = file_to_import
           to = os.path.join(mash.args.build_directory, os.path.basename(file_to_import))
 
