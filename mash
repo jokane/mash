@@ -84,7 +84,7 @@ class Frame:
         return arg
 
       commands = re.sub(r'#(\d+)', resolve_arg, commands)
-      return commands.split(';')
+      return self.split_commands(commands)
 
     elif self.parent:
       # No definition for this macro at this level.  Maybe our parent knows it?
@@ -128,7 +128,7 @@ class Frame:
 
 
     # Split the command list into individual commands.
-    command_list = self.commands.split(';')
+    command_list = self.split_commands(self.commands)
 
     # Loop through the commands we have.
     while command_list:
@@ -419,9 +419,12 @@ class Frame:
     # Done!
     return
 
+  def split_commands(self, commands):
+    return commands.split(';')
   
   def __repr__(self):
     return "Frame(%s,%s)" % (self.commands.__repr__(), self.text.__repr__())
+
 
 
 class Mash:
