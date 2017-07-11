@@ -101,6 +101,10 @@
         [[[chunk B; push]]]
       \end{center}
 
+    \section{Escaping semicolons}
+    Use a backslash to escape any semicolons within a command:
+      [[[print 1\;2]]]
+
     \section{Citations}
     [[[bibentry
       @book{abc,

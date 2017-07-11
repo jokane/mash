@@ -420,7 +420,10 @@ class Frame:
     return
 
   def split_commands(self, commands):
-    return commands.split(';')
+    # This is only a partial solution, because it might require semicolons to
+    # be escaped several times if there macros involved.
+    print "Splitting these commands:", commands
+    return map(lambda x: re.sub(r'__SEMICOLON__', ';', x), re.sub(r'\\;', '__SEMICOLON__', commands).split(';'))
   
   def __repr__(self):
     return "Frame(%s,%s)" % (self.commands.__repr__(), self.text.__repr__())
