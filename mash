@@ -422,7 +422,6 @@ class Frame:
   def split_commands(self, commands):
     # This is only a partial solution, because it might require semicolons to
     # be escaped several times if there macros involved.
-    print "Splitting these commands:", commands
     return map(lambda x: re.sub(r'__SEMICOLON__', ';', x), re.sub(r'\\;', '__SEMICOLON__', commands).split(';'))
   
   def __repr__(self):
@@ -470,6 +469,8 @@ class Mash:
       match = re.search(r"^\]\]\]", text)
       if match:
         current_frame.execute(self)
+        if current_frame.parent is None:
+          raise Exception("Found a closing delimiter (]]]) at the top level.")
         current_frame = current_frame.parent
         text = text[3:]
         continue
