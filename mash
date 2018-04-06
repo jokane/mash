@@ -147,7 +147,7 @@ class Frame:
       return
 
     # For things like "@abc/def", import that file, and replace with "def".
-    self.text = re.sub(r'@@([^\n}]*)', lambda m: self.import_and_mangle(mash, m.group(1)), self.text)
+    self.text = re.sub(r'@@([^\n},]*)', lambda m: self.import_and_mangle(mash, m.group(1)), self.text)
 
 
     # Split the command list into individual commands.
@@ -159,6 +159,9 @@ class Frame:
       command_list = command_list[1:]
       command = command.strip()
       mash.command_count += 1
+
+      # For things like "@abc/def", import that file, and replace with "def".
+      command = re.sub(r'@@([^\n},]*)', lambda m: self.import_and_mangle(mash, m.group(1)), command)
 
       # Replace things like $1 with anonymous names based on hashing the text.
       command = re.sub(r'\$(\d+)', lambda m: self.make_name(m.group(1)), command)
