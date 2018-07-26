@@ -216,6 +216,13 @@ class Frame:
         output = match.group(1)
         self.parent.append_text(output)
         continue
+
+      # append: Print literal text into the current frame, at the end.
+      match = re.search(r"^append +(.*)", command)
+      if match:
+        output = match.group(1)
+        self.append_text(output)
+        continue
       
       # Read a file (or files) and append their contents to the text of this
       # frame.
@@ -240,7 +247,7 @@ class Frame:
 
         continue
 
-      # Depend: Mark the frame dirty if given other files have been written
+      # depend: Mark the frame dirty if given other files have been written
       # elsewhere.
       match = re.search(r"^depend +(.*)", command)
       if match:
