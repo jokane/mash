@@ -411,7 +411,7 @@ class Frame:
       match = re.search(r"([a-zA-Z0-9_-]+) *(.*)", command)
       if match:
         macro_name = match.group(1)
-        macro_args = match.group(2).split(',')
+        macro_args = self.split_arguments(match.group(2))
         expansion = self.resolve_macro(macro_name, macro_args)
         if expansion:
           self.show("  expanding macro to:" + ";".join(expansion))
@@ -438,6 +438,9 @@ class Frame:
     # This is only a partial solution, because it might require semicolons to
     # be escaped several times if there macros involved.
     return map(lambda x: re.sub(r'__SEMICOLON__', ';', x), re.sub(r'\\;', '__SEMICOLON__', commands).split(';'))
+
+  def split_arguments(self, commands):
+    return map(lambda x: re.sub(r'__COMMA__', ',', x), re.sub(r'\\,', '__COMMA__', commands).split(','))
   
   def __repr__(self):
     return "Frame(%s,%s)" % (self.commands.__repr__(), self.text.__repr__())
