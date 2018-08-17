@@ -150,9 +150,8 @@ class Frame:
       self.parent.macros[name] = definition
       return
 
-    # For things like "@abc/def", import that file, and replace with "def".
+    # For things like "@abc/xyz", import that file, and replace with "xyz".
     self.text = re.sub(r'@@([^\n},\']*)', lambda m: self.import_and_mangle(mash, m.group(1)), self.text)
-
 
     # Split the command list into individual commands.
     command_list = self.split_commands(self.commands)
@@ -169,6 +168,12 @@ class Frame:
 
       # Replace things like $1 with anonymous names based on hashing the text.
       command = re.sub(r'\$(\d+)', lambda m: self.make_name(m.group(1)), command)
+
+      # Replace things like &abc with the corresponding chunk.
+      def expand_chunk(m):
+        x = self.resolve_chunk(m.group(1))
+        return x
+      command = re.sub(r'\&([A-Za-z0-9]+)', expand_chunk, command)
       self.show(command)
 
       # Commands that start with ! are "build" commands, which we should only
@@ -386,7 +391,7 @@ class Frame:
           to = self.import_file(mash, fr)
 
         continue
-      
+
       # store: Scan the text for named chunks, using the given pattern.  Store
       # them for later in our chunks dictionary.
       match = re.search(r"^store +(.*)", command)
