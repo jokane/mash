@@ -67,6 +67,10 @@ class Frame:
   def append_text(self, new_text):
     self.text += new_text
 
+  def prepend_text(self, new_text):
+    self.text = new_text + self.text
+
+
   def make_name(self, number):
     if self.text_hash is None:
       self.text_hash = hashlib.sha1(self.text + number).hexdigest()[:7]
@@ -147,7 +151,7 @@ class Frame:
       return
 
     # For things like "@abc/def", import that file, and replace with "def".
-    self.text = re.sub(r'@@([^\n},]*)', lambda m: self.import_and_mangle(mash, m.group(1)), self.text)
+    self.text = re.sub(r'@@([^\n},\']*)', lambda m: self.import_and_mangle(mash, m.group(1)), self.text)
 
 
     # Split the command list into individual commands.
@@ -223,6 +227,14 @@ class Frame:
         output = match.group(1)
         self.append_text(output)
         continue
+
+      # prepend: Print literal text into the current frame, at the beginning.
+      match = re.search(r"^prepend +(.*)", command)
+      if match:
+        output = match.group(1)
+        self.prepend_text(output)
+        continue
+      
       
       # Read a file (or files) and append their contents to the text of this
       # frame.
