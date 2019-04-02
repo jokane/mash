@@ -529,18 +529,6 @@ class Mash:
         return
 
 
-
-    text = open(self.args.input_filename, 'r').read()
-
     
-    if self.args.debug:
-      self.mash_string(text, Frame(None, "", 0, self.args.input_filename))
-    else:
-      try:
-        self.mash_string(text, Frame(None, "", 0, self.args.input_filename))
-      except Exception as e:
-        print "Error:", e
-        sys.exit(1)
-
 
 
