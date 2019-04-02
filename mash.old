@@ -1,17 +1,8 @@
 #!/usr/bin/env python
 
-# Q. Why?
-#
-# A1. Allows me to avoid naming things that appear only quickly in passing.
-# A2. Allows me to divide things into files based on content, rather than language.
-# A3. Can keep content and build instructions in the same place.
 
-
-import argparse
 import filecmp
 import hashlib
-import sys
-import re
 import os
 import subprocess
 import shutil
@@ -536,16 +527,9 @@ class Mash:
     
 
   def engage(self):
-    start_time = time.time()
-    # This is the 'main' function.
-    parser = argparse.ArgumentParser()
-    parser.add_argument(dest='input_filename', help='input filename', nargs='?')
     parser.add_argument('--diff', dest='diff', help='show differences in saved files', action='store_true')
-    parser.add_argument('--debug', '-d', dest='debug', help='on error, show stack trace', action='store_true')
-    parser.add_argument('--build_directory', '-b', dest='build_directory', help='directory for working files', default='.mash')
     parser.add_argument('--keep_directory', '-k', dest='keep_directory', help='directory for kept files', default='.')
     parser.add_argument('--clean', '-c', dest='clean', action='store_true')
-    self.args = parser.parse_args()
 
     if self.args.clean:
       if os.path.exists(self.args.build_directory):
@@ -553,25 +537,13 @@ class Mash:
       if self.args.input_filename is None:
         return
 
-    if self.args.input_filename is None:
-      parser.print_help()
-      sys.exit(1)
-
-    self.original_directory = os.getcwd()
 
     self.args.keep_directory = self.fix_path(self.args.keep_directory)
     self.args.build_directory = self.fix_path(self.args.build_directory)
 
     text = open(self.args.input_filename, 'r').read()
 
-    os.chdir(self.args.build_directory)
     
-    self.frame_count = 1
-    self.command_count = 0
-
-    self.written = dict()
-    self.touched = dict()
-
     if self.args.debug:
       self.mash_string(text, Frame(None, "", 0, self.args.input_filename))
     else:
@@ -581,11 +553,5 @@ class Mash:
         print "Error:", e
         sys.exit(1)
 
-    end_time = time.time()
-    print "%d commands; %d frames; %0.1f seconds" % (self.command_count, self.frame_count, end_time - start_time)
 
 
-if __name__ == '__main__':
-  Mash().engage()
-
-  
