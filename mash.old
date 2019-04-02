@@ -516,15 +516,6 @@ class Mash:
       eaten = match.group(1)
       text = text[len(eaten):]
 
-  def fix_path(self, path):
-    # Make sure the given path is absolute, and that it exists.
-    if not os.path.isabs(path):
-      path = os.path.join(self.original_directory, path)
-
-    if not os.path.exists(path):
-      os.makedirs(path)
-    return path
-    
 
   def engage(self):
     parser.add_argument('--diff', dest='diff', help='show differences in saved files', action='store_true')
@@ -538,8 +529,6 @@ class Mash:
         return
 
 
-    self.args.keep_directory = self.fix_path(self.args.keep_directory)
-    self.args.build_directory = self.fix_path(self.args.build_directory)
 
     text = open(self.args.input_filename, 'r').read()
 

@@ -57,11 +57,12 @@ class Mash:
       parser.print_help()
       sys.exit(1)
     
+    self.args.build_directory = self.fix_path(self.args.build_directory)
     self.original_directory = os.getcwd()
     os.chdir(self.args.build_directory)
+
     self.frame_count = 1
     self.command_count = 0
-
 
     end_time = time.time()
     print "%d commands; %d frames; %0.1f seconds" % (self.command_count, self.frame_count, end_time - start_time)
