@@ -12,39 +12,15 @@ import time
 
 class Frame:
   def __init__(self, _parent, _commands, _indent, _this_filename):
-    # Remember our parent.
-    self.parent = _parent
 
-    # Keep the list of commands.
-    self.commands = _commands 
-
-    # How much indent do we have on the first line?  The unindent command will
-    # remove this much from each line before processing anything.  Important if
-    # the text is python code.
-    self.indent = _indent
-
-    # Start with no text.  We'll probably get more later from
-    # append_text.
-    self.text = ""
-
-    # We may need to hash our text as a way of genreating unique but
-    # predictable anonymous filenames.
+    # We may need to hash our text as a way of genreating unique
+    # but predictable anonymous filenames.
     self.text_hash = None
 
-    # Remember whether anything in this frame has changed.  This is an
-    # attribute here, rather than a local variable below in execute() because
-    # it might need to be set by a child frame.
+    # Remember whether anything in this frame has changed.  This
+    # is an attribute here, rather than a local variable below in
+    # execute() because it might need to be set by a child frame.
     self.dirty = False
-
-    # Keep track of any macros that may be defined, in the form of a hash from
-    # names to definitions.  Note that resolve_macro also looks up the chain of
-    # parent frames, if it cannot find a definition at this level.
-    self.macros = dict()
-
-    # A dictionary of text chunks, for spreading the output of a program across
-    # several places.  Used by the store, lookup, and push commands.
-    self.chunks = dict()
-    self.chunks['this'] = _this_filename
 
     if self.parent:
       self.parent.show('* ' + self.commands)
@@ -55,13 +31,6 @@ class Frame:
 
   def show(self, txt):
     print self.pp + str(txt)
-
-  def append_text(self, new_text):
-    self.text += new_text
-
-  def prepend_text(self, new_text):
-    self.text = new_text + self.text
-
 
   def make_name(self, number):
     if self.text_hash is None:
@@ -466,10 +435,6 @@ class Frame:
 class Mash:
 
   def mash_string(self, text, top_frame):
-    # The current frame for whatever we're parsing now.  This top one has no
-    # parent.
-    current_frame = top_frame
-    
     while text:
       # Match an opening delimiter?
       match = re.search(r"^\[\[\[(.*)\n(\s*)", text)

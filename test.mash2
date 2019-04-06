@@ -1,5 +1,21 @@
-[[[{save("examples.tex")}
+[[[{from mashlib import *}]]]
+
+[[[{
+    save("examples.tex")
+    t = '\}'
+    print("foo bar")
+  }
+
   \documentclass[11pt]{article}
   \begin{document}
+    [[[{save("example.dot")}
+      graph {
+        A -- B}
+      }
+    ]]]
+
+    [[[
+      No commands in this one.
+    ]]]
   \end{document}
 ]]]

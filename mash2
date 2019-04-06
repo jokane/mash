@@ -14,7 +14,7 @@
 # A3. Can keep content and build instructions in the same place.
 #
 # History:
-#   2016-11-17: Started as a revision of older, presentation-specific scripts.
+#   2016-11-17: Started as a revision of some older, presentation-specific scripts.
 #   2016-12-12: First working version.
 #   2017-02-20: Various language additions, mostly for build commands.
 #   2017-04-20: More language expansions.  Better error handling.
@@ -32,13 +32,116 @@ import os
 import subprocess
 import time
 
+from mashlib import *
+
 class Frame:
-  def __init__(self, _parent, _commands, _indent, _this_filename):
-    # Remember our parent.
+  def __init__(self, _parent):
+    # Remember our parent frame, or None if we're the root.
     self.parent = _parent
+
+    # The full contents of this frame, including commands and text, which will
+    # be filled in as we go.
+    self.contents = ""
+
+  def execute(self, mash):
+    # Separate the commands at the start from the main text.
+    depth = 0
+    self.contents = self.contents.lstrip()
+
+    # Don't let any escaped \{ or \} interfere with finding the end of the
+    # commands, by replacing each with an unlikely but harmless string.
+    self.contents = re.sub("\\\\{", "_____OPEN_____", self.contents)
+    self.contents = re.sub("\\\\}", "_____CLOSE_____", self.contents)
+
+    # Are there any commands?
+    if len(self.contents[0]) == 0 or self.contents[0] != '{':
+      # No.  Everything is the text.
+      self.commands = ""
+      self.text = self.contents
+    else:
+      # Yes.  Find the index in self.contents where the commands end.
+      for index in range(0, len(self.contents)):
+        if self.contents[index] == '{': depth +=1
+        if self.contents[index] == '}': depth -=1
+        if depth == 0:
+          break
+
+      # Split the contents into commands and text, discarding the initial {
+      # and ending } from the commands.
+      self.commands = self.contents[1:index]
+      self.text = self.contents[index+1:]
+
+    # Undo the escaping.
+    self.commands = re.sub("_____OPEN_____", "\\{", self.commands)
+    self.commands = re.sub("_____CLOSE_____", "\\}", self.commands)
+    self.text = re.sub("_____OPEN_____", "\\{", self.text)
+    self.text = re.sub("_____CLOSE_____", "\\}", self.text)
+
+    # Fix the indentation of the commands.  This allows us to write python code
+    # that is _all_ indented, without annoying the interpreter.
+    self.commands = unindent(self.commands)
+
+    print("commands:", self.commands)
+    print("text:", self.text)
+
+    # Actually execute the commands.
+    exec(self.commands)
+
+def unindent(s):
+  # Find the prefix that we want to remove.  It is the sequence of tabs or
+  # spaces that preceeds the first real character.
+  match = re.search(r'([ \t]*)[^ \t\n]', s)
+
+  # If we found a prefix, remove it from the start of every line.
+  print("Unindenting this:")
+  print(s)
+  if match:
+    prefix = match.group(1)
+    print("Prefix is (%s)" % prefix)
+    s = re.sub('\n' + prefix, '\n', s)
+    print("After:")
+    print(s)
+  else:
+    print("No prefix found.")
+  return s
+
 
 class Mash:
   def mash_string(self, text, top_frame):
+    # The current frame for whatever we're parsing now.  The top
+    # one has no parent.
+    current_frame = top_frame
+
+    # Walk through the text, looking for child frames, consuming
+    # the text from the local variable 'text' as we go.
+    while text:
+      # Do we have an opening delimiter next?
+      match = re.search(r"^\[\[\[", text)
+      if match:
+        # Yes, this is the start of a new frame.  Create it as the
+        # child of the current one.  We'll add the text in future
+        # iterations of this loop, and execute it when we see the
+        # closing delimiter.
+        current_frame = Frame(current_frame)
+        text = text[3:]
+      
+      # Do we have a closing delimiter next?
+      match = re.search(r"^\]\]\]", text)
+      if match:
+        current_frame.execute(self)
+        if current_frame.parent is None:
+          raise Exception("Found a closing delimiter (]]]) at the top level.")
+        current_frame = current_frame.parent
+        text = text[3:]
+        continue
+
+      # Not seeing opening nor closing delimiters.  Grab as much ordinary text as
+      # we can.  At least one character, until we see [ or ] again.
+      match = re.search(r"^(.[^\[\]]*)", text, re.DOTALL)
+      current_frame.contents += match.group(0)
+      eaten = match.group(1)
+      text = text[len(eaten):]
+    
 
   def fix_path(self, path):
     """ Make sure the given path is absolute, and that it exists."""
@@ -55,7 +158,6 @@ class Mash:
 
     parser = argparse.ArgumentParser()
     parser.add_argument(dest='input_filename', help='input filename', nargs='?')
-    parser.add_argument('--build_directory', '-b', dest='build_directory', help='directory for working files', default='.mash')
     parser.add_argument('--debug', '-d', dest='debug', help='on error, show stack trace', action='store_true')
     self.args = parser.parse_args()
 
@@ -63,29 +165,22 @@ class Mash:
       parser.print_help()
       sys.exit(1)
     
-    self.original_directory = os.getcwd()
-    self.args.build_directory = self.fix_path(self.args.build_directory)
-
     self.frame_count = 1
-    self.command_count = 0
 
-    text = open(self.args.input_filename, 'r').read()
+
+    text = open(os.path.join(sys.path[0], self.args.input_filename), 'r').read()
     
-    os.chdir(self.args.build_directory)
-
     if self.args.debug:
-      self.mash_string(text, Frame(None, "", 0, self.args.input_filename))
+      self.mash_string(text, Frame(None))
     else:
       try:
-        self.mash_string(text, Frame(None, "", 0, self.args.input_filename))
+        self.mash_string(text, Frame(None))
       except Exception as e:
         print("Error:", e)
         sys.exit(1)
 
-
-
     end_time = time.time()
-    print("%d commands; %d frames; %0.1f seconds" % (self.command_count, self.frame_count, end_time - start_time))
+    print("%d frames; %0.1f seconds" % (self.frame_count, end_time - start_time))
 
 if __name__ == '__main__':
   Mash().engage()
