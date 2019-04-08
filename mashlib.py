@@ -4,18 +4,19 @@
 
 import os
 import shutil
+import difflib
 
 # This is the directory where started.
 original_directory = os.getcwd()
 
 # This is the directory where we will do all of our work, execute commands,
 # etc.  This will be the current directory most of the time.
-build_directory = ".mash"
+build_directory = os.path.join(original_directory, ".mash")
 
 # This is the build directory from the previous time through.  If nothing has
 # changed, then we can just copy things over from there instead of re-building
 # them.
-prev_directory = ".mash-prev"
+prev_directory = os.path.join(original_directory, ".mash-prev")
 
 
 # Move any existing build directory to be the previous directory.  Delete any
@@ -43,12 +44,11 @@ def save(target):
 
   # Check for an identically-named, identical-contents file in the previous
   # directory.
-  existing_contents = ''
   prev_name = os.path.join(prev_directory, target)
   try:
     existing_contents = open(prev_name, 'r').read()
     exists_already = (existing_contents == _.text)
-  except IOError:
+  except IOError as e:
     exists_already = False
 
   if exists_already:
@@ -56,11 +56,11 @@ def save(target):
     # saving directly.  This keeps the timestamp intact, which can help us
     # tell elsewhere if things need to be rebuilt.
     print("Using %s from previous build." % target)
-    shuitl.copy(prev_name, target)
+    shutil.copy(prev_name, target)
 
   else:
     # We don't have a file like this anywhere.  Actually save it.
     print("Writing %d bytes to %s." % (len(_.text), target))
-    print(_.text, file=open(target, 'w'))
+    print(_.text, file=open(target, 'w'), end='')
 
 
