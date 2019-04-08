@@ -153,15 +153,6 @@ class Frame:
       if match:
         target = match.group(1)
         
-        # Figure out if the file already exists with the same contents.
-        existing_contents = ''
-        try:
-          f = open(target, 'r')
-          existing_contents = f.read()
-          f.close()
-          exists_already = (existing_contents == self.text)
-        except IOError:
-          exists_already = False
 
         if not exists_already:
           if mash.args.diff:

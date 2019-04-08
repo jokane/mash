@@ -34,20 +34,17 @@ if not os.path.exists(build_directory):
   print("Creating", build_directory)
   os.makedirs(build_directory)
 os.chdir(build_directory)
-  
 
-
-def save(fname):
+def save(target):
   global _
-  print("Saving to", fname)
-  
   # Does this file already exist?  If so, something is probably wrong.
-  if(os.path.isfile(fname)):
-    raise Exception("File %s already exists.", fname)
+  if(os.path.isfile(target)):
+    raise Exception("File %s already exists.", target)
 
-  # Check for an identically-named, identical-contents file in the previous directory.
+  # Check for an identically-named, identical-contents file in the previous
+  # directory.
   existing_contents = ''
-  prev_name = os.path.join(prev_directory, fname)
+  prev_name = os.path.join(prev_directory, target)
   try:
     existing_contents = open(prev_name, 'r').read()
     exists_already = (existing_contents == _.text)
@@ -56,13 +53,14 @@ def save(fname):
 
   if exists_already:
     # We have this exact file in the previous directory.  Copy it instead of
-    # saving directly.  This keeps the timestamp intact, which can help us tell
-    # elsewhere if things need to be rebuilt.
-    print("Using %s from previous build." % fname)
-    shuitl.copy(prev_name, fname)
+    # saving directly.  This keeps the timestamp intact, which can help us
+    # tell elsewhere if things need to be rebuilt.
+    print("Using %s from previous build." % target)
+    shuitl.copy(prev_name, target)
 
   else:
     # We don't have a file like this anywhere.  Actually save it.
-    print("Writing", fname)
+    print("Writing %d bytes to %s." % (len(_.text), target))
+    print(_.text, file=open(target, 'w'))
 
 

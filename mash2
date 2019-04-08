@@ -32,8 +32,6 @@ import os
 import subprocess
 import time
 
-from mashlib import *
-
 class Frame:
   def __init__(self, _parent):
     # Remember our parent frame, or None if we're the root.
@@ -77,34 +75,40 @@ class Frame:
     self.text = re.sub("_____OPEN_____", "\\{", self.text)
     self.text = re.sub("_____CLOSE_____", "\\}", self.text)
 
-    # Fix the indentation of the commands.  This allows us to write python code
-    # that is _all_ indented, without annoying the interpreter.
+    # Fix the indentation of the commands.  This allows us to
+    # write python code that is _all_ indented, without annoying
+    # the interpreter.
     self.commands = unindent(self.commands)
 
-    print("commands:", self.commands)
-    print("text:", self.text)
+    #print("commands:", self.commands)
+    #print("text:(", self.text, ")")
+
+    # Check for and execute any special commands.
+    # 1. #include <fname>: Search the path for a file with the given name.
+    # Execute it as python code in the top level.
+    def resolve_include(match):
+      fname = match.group(1)
+      for directory in sys.path:
+        x = os.path.join(directory, fname)
+        if os.path.exists(x):
+          print("Including", fname, "from", directory)
+          exec(open(x, 'r').read(), mash.vars, mash.vars)
+    self.commands = re.sub(r'^#include (.*)$', resolve_include, self.commands, re.MULTILINE)
 
     # Actually execute the commands.
-    exec(self.commands)
+    mash.vars['_'] = self
+    exec(self.commands, mash.vars, mash.vars)
 
 def unindent(s):
-  # Find the prefix that we want to remove.  It is the sequence of tabs or
-  # spaces that preceeds the first real character.
+  # Find the prefix that we want to remove.  It is the sequence
+  # of tabs or spaces that preceeds the first real character.
   match = re.search(r'([ \t]*)[^ \t\n]', s)
 
   # If we found a prefix, remove it from the start of every line.
-  print("Unindenting this:")
-  print(s)
   if match:
     prefix = match.group(1)
-    print("Prefix is (%s)" % prefix)
     s = re.sub('\n' + prefix, '\n', s)
-    print("After:")
-    print(s)
-  else:
-    print("No prefix found.")
   return s
-
 
 class Mash:
   def mash_string(self, text, top_frame):
@@ -167,6 +171,7 @@ class Mash:
     
     self.frame_count = 1
 
+    self.vars = dict()
 
     text = open(os.path.join(sys.path[0], self.args.input_filename), 'r').read()
     
