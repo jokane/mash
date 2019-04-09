@@ -29,6 +29,7 @@ import argparse
 import sys
 import re
 import os
+import shutil
 import subprocess
 import time
 
@@ -170,7 +171,7 @@ class Mash:
 
     self.vars = dict()
 
-    text = open(os.path.join(sys.path[0], self.args.input_filename), 'r').read()
+    text = open(self.args.input_filename, 'r').read()
     
     if self.args.debug:
       self.mash_string(text, Frame(None))
