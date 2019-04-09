@@ -43,8 +43,7 @@ class Frame:
     self.contents = ""
 
   def execute(self, mash):
-    # Separate the commands at the start from the main text.
-    depth = 0
+    mash.frame_count += 1
 
     # Do we have a command separator?
     match = re.match("(.*)\|\|\|(.*)", self.contents, re.DOTALL)
