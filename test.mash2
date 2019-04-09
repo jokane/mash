@@ -1,12 +1,38 @@
 [[[{#include mashlib.py}]]]
 
 [[[{
-    save("examples.tex")
-  }
+  import re
 
+  def dot():
+    name = anon()
+    save(name + ".dot")
+    if not retrieve(name+".pdf", name+".dot"):
+      exec("dot -Tpdf %s.dot -o %s.pdf" % (name, name))
+    _.parent.contents += "\\includegraphics{%s.pdf}" % name
+
+  def latex(name):
+    save(name + ".tex") 
+    deps = [name + ".tex"]
+    for match in re.finditer(r'\\includegraphics([.*])?{([^\}]*)}', _.text):
+      deps.append(match.group(2))
+    if not retrieve(name+".pdf", *deps):
+      exec("pdflatex %s" % name)
+    keep(name+".pdf") 
+
+
+}]]]
+
+[[[{latex("example")}
   \documentclass[11pt]{article}
+  \usepackage{graphicx}
+  \usepackage{fullpage}
   \begin{document}
-    [[[{save("example.dot")}
+    \title{User's guide for \texttt{mash}}
+    \date{[[[{_.parent.contents += "today"}]]]}
+    
+    \maketitle
+
+    [[[{dot()}
       graph {
         A -- B
       }

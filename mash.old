@@ -32,11 +32,6 @@ class Frame:
   def show(self, txt):
     print self.pp + str(txt)
 
-  def make_name(self, number):
-    if self.text_hash is None:
-      self.text_hash = hashlib.sha1(self.text + number).hexdigest()[:7]
-    return self.text_hash + number
-
   def import_and_mangle(self, mash, fr):
     fr = os.path.join(mash.original_directory,fr)
     to = self.import_file(mash, fr)
@@ -136,40 +131,6 @@ class Frame:
         return x
       command = re.sub(r'\&([A-Za-z0-9]+)', expand_chunk, command)
       self.show(command)
-
-      # Commands that start with ! are "build" commands, which we should only
-      # execute if we are a 'dirty' frame: If something has changed.
-      match = re.search(r'^!(.*)', command)
-      if match and self.dirty:
-        # We need to build.  Drop the ! and continue normally.
-        command = match.group(1)
-      if match and not self.dirty:
-        # No need to build.  Skip to the next thing.
-        self.show("  (skipped)")
-        continue
-
-      # Save text to a file.
-      match = re.search(r"^save +(.*)", command)
-      if match:
-        target = match.group(1)
-        
-
-        if not exists_already:
-          if mash.args.diff:
-            pass
-            self.show('  ' + ''.join(difflib.unified_diff(existing_contents.splitlines(1), self.text.splitlines(1))))
-          f = open(target, 'w')
-          print >>f, self.text,
-          f.close()
-          self.dirty = True
-          mash.written[target] = True
-          self.show("  (writing; frame is dirty)")
-        else:
-          self.show("   (no change)")
-          pass
-        mash.touched[target] = True
-
-        continue
       
       # print: Print literal text into the parent frame at this location.
       match = re.search(r"^print +(.*)", command)
@@ -252,13 +213,6 @@ class Frame:
           raise Exception("Shell command '%s' failed with return code %d." % (shell_command, return_code))
         continue
 
-      # Change the directory for kept files.
-      match = re.search(r"^keepdir +(.*)", command)
-      if match:
-        mash.args.keep_directory = match.group(1)
-        mash.args.keep_directory = mash.fix_path(mash.args.keep_directory)
-        continue
-
       # Filter the text through a shell command.
       match = re.search(r"^filter +(.*)", command)
       if match:
@@ -269,7 +223,7 @@ class Frame:
           raise Exception("Filter command '%s' failed with return code %d." % (shell_command, p.returncode))
         continue
 
-      # Strip leading a trailing spaces.
+      # Strip leading and trailing spaces.
       match = re.search(r"^strip", command)
       if match:
         self.text = self.text.strip()
@@ -281,19 +235,6 @@ class Frame:
         self.parent.append_text(self.text)
         self.parent.macros.update(self.macros)
         self.parent.chunks.update(self.chunks)
-        continue
-
-      # Fix the indentation of the text.
-      match = re.search(r"^unindent", command)
-      if match:
-        self.show("  unindenting by %s spaces" % self.indent)
-        self.text = re.sub("\n {%d}" % self.indent, "\n", self.text)
-        continue
-
-      # Clear the current text.
-      match = re.search(r"^clear", command)
-      if match:
-        self.text = ""
         continue
 
       # Include another mash file.
@@ -319,16 +260,6 @@ class Frame:
       # Keep a file by copying it to the input directory.
       match = re.search(r"^keep +(.*)", command)
       if match:
-        file_to_keep = match.group(1)
-        if os.path.isfile(file_to_keep):
-          shutil.copy(file_to_keep, mash.args.keep_directory)
-        elif os.path.isdir(file_to_keep):
-          target = os.path.join(mash.args.keep_directory, file_to_keep)
-          if os.path.exists(target):
-            shutil.rmtree(target)
-          shutil.copytree(file_to_keep, target)
-        else:
-          raise Exception("Don't know how to keep %s, which is neither file nor directory." % file_to_keep)
         continue
 
       # Import a file from the input directory into the build directory.
@@ -454,23 +385,6 @@ class Mash:
         
         continue
           
-
-      # Match a closing delimiter?
-      match = re.search(r"^\]\]\]", text)
-      if match:
-        current_frame.execute(self)
-        if current_frame.parent is None:
-          raise Exception("Found a closing delimiter (]]]) at the top level.")
-        current_frame = current_frame.parent
-        text = text[3:]
-        continue
-      
-      # Not seeing opening or closing delimiters.  Grab as much ordinary text as
-      # we can.  At least one character, until we see [ or ] again.
-      match = re.search(r"^(.[^\[\]]*)", text, re.DOTALL)
-      current_frame.append_text(match.group(0))
-      eaten = match.group(1)
-      text = text[len(eaten):]
 
 
   def engage(self):
