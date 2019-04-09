@@ -44,47 +44,28 @@ class Frame:
   def execute(self, mash):
     # Separate the commands at the start from the main text.
     depth = 0
-    self.contents = self.contents.lstrip()
 
-    # Don't let any escaped \{ or \} interfere with finding the end of the
-    # commands, by replacing each with an unlikely but harmless string.
-    self.contents = re.sub("\\\\{", "_____OPEN_____", self.contents)
-    self.contents = re.sub("\\\\}", "_____CLOSE_____", self.contents)
-
-    # Are there any commands?
-    if len(self.contents[0]) == 0 or self.contents[0] != '{':
-      # No.  Everything is the text.
-      self.commands = ""
-      self.text = self.contents
+    # Do we have a command separator?
+    match = re.match("(.*)\|\|\|(.*)", self.contents, re.DOTALL)
+    if match:
+      # Yes.  Everything before are the commands; everything after is the text.
+      self.commands = match.group(1)
+      self.text = match.group(2)
     else:
-      # Yes.  Find the index in self.contents where the commands end.
-      for index in range(0, len(self.contents)):
-        if self.contents[index] == '{': depth +=1
-        if self.contents[index] == '}': depth -=1
-        if depth == 0:
-          break
-
-      # Split the contents into commands and text, discarding the initial {
-      # and ending } from the commands.
-      self.commands = self.contents[1:index]
-      self.text = self.contents[index+1:]
-
-    # Undo the escaping.
-    self.commands = re.sub("_____OPEN_____", "\\{", self.commands)
-    self.commands = re.sub("_____CLOSE_____", "\\}", self.commands)
-    self.text = re.sub("_____OPEN_____", "\\{", self.text)
-    self.text = re.sub("_____CLOSE_____", "\\}", self.text)
+      # No.  All of it is commands.
+      self.commands = self.contents
+      self.text = ''
 
     # Fix the indentation of the commands.  This allows us to
     # write python code that is _all_ indented, without annoying
     # the interpreter.
     self.commands = unindent(self.commands)
 
-    #print("commands:", self.commands)
-    #print("text:(", self.text, ")")
+    #print("commands:\n", self.commands)
+    #print("text:\n", self.text)
 
     # Check for and execute any special commands.
-    # 1. #include <fname>: Search the path for a file with the given name.
+    # 1. include <fname>: Search the path for a file with the given name.
     # Execute it as mash code.
     def resolve_include(match):
       fname = match.group(1)
@@ -170,7 +151,16 @@ class Mash:
     parser = argparse.ArgumentParser()
     parser.add_argument(dest='input_filename', help='input filename', nargs='?')
     parser.add_argument('--debug', '-d', dest='debug', help='on error, show stack trace', action='store_true')
+    parser.add_argument('--clean', '-c', dest='clean', action='store_true')
     self.args = parser.parse_args()
+
+    if self.args.clean:
+      if os.path.exists(".mash"):
+        shutil.rmtree(".mash")
+      if os.path.exists(".mash-prev"):
+        shutil.rmtree(".mash-prev")
+      if self.args.input_filename is None:
+        return
 
     if self.args.input_filename is None:
       parser.print_help()
