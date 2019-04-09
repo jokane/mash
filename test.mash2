@@ -1,4 +1,4 @@
-[[[{#include mashlib.py}]]]
+[[[{include mashlib.mash}]]]
 
 [[[{
   import re
@@ -39,7 +39,6 @@
     push("\includegraphics[%s]{%s.pdf}" % (args, name))
 
   def xfig(fname_fig, args=''):
-    fname_fig = imprt(fname_fig)
     fname_pdf = re.sub("\.fig", ".pdf", fname_fig)
     if not retrieve(fname_pdf, fname_fig):
       shell("fig2dev -L pdf %s %s" % (fname_fig, fname_pdf))
@@ -55,6 +54,9 @@
     save('bib.bib')
     push('\\bibliographystyle{%s}' % style)
     push('\\bibliography{bib}')
+
+
+    
 
 }]]]
 
@@ -91,6 +93,7 @@
     Python code, enclosed in curly braces.
 
     \section{Examples}
+    \subsection{Graphviz}
     Here is a graph, compiled using \texttt{dot} from text embedded right
     here.
     \begin{center}
@@ -111,12 +114,17 @@
         }
       ]]]
     \end{center}
+    
+    \subsection{Xfig}
     Here is an xfig figure.  It depends on an external xfig document, which
     is imported into the build directory first.
     \begin{center}
-      [[[{xfig("stick.fig")}]]]
+      [[[{xfig("@@figs/stick.fig")}]]]
     \end{center}
 
+    [[[{imprt("figs/*.fig")}]]]
+
+    \subsection{BibTeX}
     [[[{bib_entry()}
       @book{abc,
         author = {A. B. Cee and D. E. Eff},
@@ -137,6 +145,61 @@
         year = 2016
       }
     ]]]
+
+    \subsection{Python}
+
+    Here are some Fibonacci numbers which are computed every time we mash
+    this document:
+    $$
+      [[[{unindent(); filter("python"); strip(); push()}
+        a = 0
+        b = 1
+
+        for i in range(1, 10):
+          c = a + b
+          a = b
+          b = c
+          print c, "\\qquad",
+      ]]]
+    $$
+
+    Here are some squares which are computed only when the code changes:
+    [[[{
+      def python_output():
+        unindent();
+        name = anon();
+        save(name+".py")
+        if not retrieve(name+".tex", name+".py"):
+          shell("python %s > %s" % (name+".py", name+".tex"))
+        push("\input{%s.tex}" % name)
+    }]]]
+
+    [[[{python_output()}
+      print "$$"
+      for i in range(1, int(1e6)):
+        pass
+
+      for i in range(1, 10):
+        print i*i, "\\qquad"
+      print "$$"
+    ]]]
+
+
+
+    \subsection{Include files}
+    [[[include included.mash]]] 
+
+    \section{The Mash core}
+    - frames
+      
+      + unindenting
+
+      + escaping
+
+    - special command: \#include
+
+    - frame hooks, before and after
+
 
     \section{The standard library}
     

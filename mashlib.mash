@@ -1,11 +1,16 @@
+[[[{
+# vim: set ft=python :
+
 # This is a library of "standard" functions that provide many of the basic
-# operations that one might want to do on a mash frame.  It it should be
-# imported automatically at the start of a mash run.
+# operations that one might want to do on a mash frame.  Most mash documents
+# will include this near the start. 
 
 import difflib
+import glob
 import filecmp
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 
@@ -136,18 +141,23 @@ def keep(file_to_keep):
   else:
     raise Exception("Don't know how to keep %s, which is neither file nor directory." % file_to_keep)
   
-def imprt(fname):
-  """Copy a file from the original directory to the build directory."""
-  fr = os.path.join(original_directory, os.path.basename(fname))
-  to = os.path.join(build_directory, os.path.basename(fname))
+def imprt(pattern):
+  """Copy one or more files from the original directory to the build directory."""
+
+  globs = glob.glob(os.path.join(original_directory,pattern))
+  if not globs:
+    raise Exception("Trying to import %s, but no files match." % pattern)
+  
+  for fname in globs:
+    fr = os.path.join(original_directory, fname)
+    to = os.path.join(build_directory, os.path.basename(fname))
 
   # Does this file exist already?
   if os.path.isfile(to) and filecmp.cmp(fr, to, False):
     # Yes.  Nothing to do.
-    print("not importing", fr)
     pass
   else:
-    print("importing", fr)
+    print(fr)
     shutil.copy2(fr, to)
   
   return fname
@@ -155,9 +165,29 @@ def imprt(fname):
 def filter(shell_command):
   print(shell_command)
   p = subprocess.Popen(shell_command, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-  _.text = p.communicate(input=_.text)[0].decode('UTF-8')
+  _.text = p.communicate(input=_.text.encode('UTF-8'))[0].decode('UTF-8')
   if p.returncode != 0:
     raise Exception("Filter command '%s' failed with return code %d." % (shell_command, p.returncode))
 
 def strip():
   _.text = _.text.rstrip()
+
+def unindent():
+  match = re.search(r'([ \t]*)[^ \t\n]', _.text)
+  if match:
+    prefix = match.group(1)
+    _.text = re.sub('\n' + prefix, '\n', _.text)
+
+
+def before_frame_hook():
+  # For things like "@abc/xyz", import that file and replace with "xyz".
+  def import_and_mangle(match):
+    fr = match.group(1)
+    fr = os.path.join(original_directory,fr)
+    to = imprt(fr)
+    return to
+  _.text = re.sub(r'@@([^\n\},\']*)', import_and_mangle, _.text)
+  _.commands = re.sub(r'@@([^\n\},\'\"]*)', import_and_mangle, _.commands)
+
+}]]]
+

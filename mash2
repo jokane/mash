@@ -85,19 +85,26 @@ class Frame:
 
     # Check for and execute any special commands.
     # 1. #include <fname>: Search the path for a file with the given name.
-    # Execute it as python code in the top level.
+    # Execute it as mash code.
     def resolve_include(match):
       fname = match.group(1)
       for directory in sys.path:
         x = os.path.join(directory, fname)
         if os.path.exists(x):
           print(x)
-          exec(open(x, 'r').read(), mash.vars, mash.vars)
-    self.commands = re.sub(r'^#include (.*)$', resolve_include, self.commands, re.MULTILINE)
+          mash.mash_string(open(x, 'r').read(), self)
+          return
+      raise Exception("Trying to include %s, but could not find that file." % fname)
+
+    self.commands = re.sub(r'^include (.*)$', resolve_include, self.commands, re.MULTILINE)
 
     # Actually execute the commands.
     mash.vars['_'] = self
+    if "before_frame_hook" in mash.vars:
+      exec("before_frame_hook()", mash.vars, mash.vars)
     exec(self.commands, mash.vars, mash.vars)
+    if "after_frame_hook" in mash.vars:
+      exec("after_frame_hook()", mash.vars, mash.vars)
 
 def unindent(s):
   # Find the prefix that we want to remove.  It is the sequence
