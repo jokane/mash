@@ -3,9 +3,11 @@
 # imported automatically at the start of a mash run.
 
 import difflib
+import filecmp
 import hashlib
 import os
 import shutil
+import subprocess
 
 # This is the directory where started.
 original_directory = os.getcwd()
@@ -26,17 +28,17 @@ keep_directory = original_directory
 # Move any existing build directory to be the previous directory.  Delete any
 # existing previous directory.
 if os.path.exists(prev_directory):
-  print("Removing", prev_directory)
+  #print("Removing", prev_directory)
   shutil.rmtree(prev_directory)
 
 if os.path.exists(build_directory):
-  print("Moving", build_directory, "to", prev_directory)
+  #print("Moving", build_directory, "to", prev_directory)
   shutil.move(build_directory, prev_directory)
 
 # Make sure we have a build directory and that it's the current/working
 # directory.
 if not os.path.exists(build_directory):
-  print("Creating", build_directory)
+  #print("Creating", build_directory)
   os.makedirs(build_directory)
 os.chdir(build_directory)
 
@@ -62,12 +64,12 @@ def save(target):
     # We have this exact file in the previous directory.  Copy it instead of
     # saving directly.  This keeps the timestamp intact, which can help us
     # tell elsewhere if things need to be rebuilt.
-    print("Using %s from previous build." % target)
+    #print("Using %s from previous build." % target)
     shutil.copy2(prev_name, target)
 
   else:
     # We don't have a file like this anywhere.  Actually save it.
-    print("Writing %d bytes to %s." % (len(_.text), target))
+    #print("Writing %d bytes to %s." % (len(_.text), target))
     print(_.text, file=open(target, 'w'), end='')
 
 def retrieve(target, *sources):
@@ -75,23 +77,31 @@ def retrieve(target, *sources):
   and if so, if it's newer than all of the given sources.  If so, copy it
   over and return True.  If not, do nothing and return False."""
   prev_target = os.path.join(prev_directory, target)
-  if not os.path.isfile(prev_target):
-    print(target,"is not available.")
-    return False
 
-  target_time = os.path.getmtime(prev_target)
+  ok = True
+
+  if not os.path.isfile(prev_target):
+    #print(target,"is not available.")
+    print("(%s):" % target, end='')
+    ok = False
+    target_time = None
+  else:
+    print("%s:" % target, end='')
+    target_time = os.path.getmtime(prev_target)
+
 
   for source in sources:
     source_time = os.path.getmtime(source)
-    if source_time > target_time:
-      print(source, source_time, "is newer than", target, target_time)
-      return False
+    if target_time is None or source_time > target_time:
+      print(" (%s)" % source, end='')
+      ok = False
+    else:
+      print(" %s" % source, end='')
 
-  print(target,"is available from previous build.")
-  shutil.copy2(prev_target, build_directory)
+  print()
+  if ok: shutil.copy2(prev_target, build_directory)
 
-
-  return True
+  return ok
 
 def anon():
   """Return an anonymous name constructed by hashing the contents of the
@@ -99,12 +109,19 @@ def anon():
   global _
   return hashlib.sha1(_.text.encode('UTF-8')).hexdigest()[:7]
 
-def exec(command):
+def shell(command):
   """Execute the given command in a shell.  If it fails, complain."""
+  print("  ", command)
   return_code = os.system(command)
-  print("(exec)", command)
   if return_code != 0:
-    raise Exception("Shell command '%s' failed with return code %d." % (shell_command, return_code))
+    raise Exception("Shell command '%s' failed with return code %d." % (command, return_code))
+
+def push(text=""):
+  global _
+  if text:
+    _.parent.contents += text
+  else:
+    _.parent.contents += _.text
 
 def keep(file_to_keep):
   """Copy a file or directory from the working directory to the keep
@@ -119,4 +136,28 @@ def keep(file_to_keep):
   else:
     raise Exception("Don't know how to keep %s, which is neither file nor directory." % file_to_keep)
   
+def imprt(fname):
+  """Copy a file from the original directory to the build directory."""
+  fr = os.path.join(original_directory, os.path.basename(fname))
+  to = os.path.join(build_directory, os.path.basename(fname))
 
+  # Does this file exist already?
+  if os.path.isfile(to) and filecmp.cmp(fr, to, False):
+    # Yes.  Nothing to do.
+    print("not importing", fr)
+    pass
+  else:
+    print("importing", fr)
+    shutil.copy2(fr, to)
+  
+  return fname
+
+def filter(shell_command):
+  print(shell_command)
+  p = subprocess.Popen(shell_command, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+  _.text = p.communicate(input=_.text)[0].decode('UTF-8')
+  if p.returncode != 0:
+    raise Exception("Filter command '%s' failed with return code %d." % (shell_command, p.returncode))
+
+def strip():
+  _.text = _.text.rstrip()

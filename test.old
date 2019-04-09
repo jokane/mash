@@ -1,0 +1,81 @@
+[[[def latexdoc: save #1.tex; pdflatex #1; pdflatex #1; pdflatex #1; !keep #1.pdf]]]
+[[[def latexdoc-withbib: save #1.tex; pdflatex #1; !exec bibtex #1; pdflatex #1; pdflatex #1; !keep #1.pdf]]]
+
+[[[def bibentry: save bib-$1]]]
+
+[[[latexdoc-withbib examples
+
+  \begin{document}
+    \section{Python}
+
+    Here are some Fibonacci numbers (which are computed every time we mash this document):
+    $$
+      [[[unindent; filter python; strip; push
+        a = 0
+        b = 1
+
+        for i in range(1, 10):
+          c = a + b
+          a = b
+          b = c
+          print c, "\\qquad",
+      ]]]
+    $$
+
+    Here are some squares (which are computed only when the code changes):
+    [[[unindent; save $1.py; !exec python $1.py > $2.tex; print \input{$2.tex}
+      print "$$"
+      for i in range(1, 10):
+        print i*i, "\\qquad"
+      print "$$"
+    ]]]
+
+
+    \section{Include Files}
+    [[[include included.mash]]]
+
+
+    \section{Named chunks}
+
+      [[[unindent; filter python; store chunk ([a-zA-Z0-9]*) \(\((.*?)\)\); clear; push
+        import math
+        print "chunk A (( The square root of 2 is %f. ))" % math.sqrt(2)
+        print "chunk B (( The square root of 3 is %f. ))" % math.sqrt(3)
+        print "chunk C (( The square root of 4 is %f. ))" % math.sqrt(4)
+      ]]]
+
+      Here's a simple fact:
+      \begin{center}
+        [[[chunk A; push]]]
+      \end{center}
+      This is also true:
+      \begin{center}
+        [[[chunk C; push]]]
+      \end{center}
+      And this:
+      \begin{center}
+        [[[chunk B; push]]]
+      \end{center}
+
+
+    [[[purge bib-*; read bib-*; save test.bib]]]
+
+    \section{Dependencies}
+    [[[unindent; save a.py
+      def func(x):
+        return 4*x
+    ]]]
+
+    Sometimes you'll need to declare dependencies explicitly.  This Python code
+    depends on module a, create above, but \texttt{mash} doesn't know that
+    without a depend command.  If the \texttt{a.py} frame changes, then this
+    Python snippet will be re-run:
+    [[[unindent; save $1.py; depend a.py; !exec python $1.py > $1.txt; clear; read $1.txt; push
+      import a
+      print a.func(10)
+    ]]]
+
+
+  \end{document}
+
+]]]

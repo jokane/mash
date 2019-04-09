@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-
-
 import filecmp
 import hashlib
 import os
@@ -11,69 +8,12 @@ import glob
 import time
 
 class Frame:
-  def __init__(self, _parent, _commands, _indent, _this_filename):
-
-    # We may need to hash our text as a way of genreating unique
-    # but predictable anonymous filenames.
-    self.text_hash = None
-
-    # Remember whether anything in this frame has changed.  This
-    # is an attribute here, rather than a local variable below in
-    # execute() because it might need to be set by a child frame.
-    self.dirty = False
-
-    if self.parent:
-      self.parent.show('* ' + self.commands)
-      self.pp = self.parent.pp + '    '
-    else:
-      self.pp = ''
-
-
-  def show(self, txt):
-    print self.pp + str(txt)
 
   def import_and_mangle(self, mash, fr):
     fr = os.path.join(mash.original_directory,fr)
     to = self.import_file(mash, fr)
     return to
 
-  def import_file(self, mash, fr):
-    to = os.path.join(mash.args.build_directory, os.path.basename(fr))
-
-    # Does this file exist already?
-    if os.path.isfile(to) and filecmp.cmp(fr, to, False):
-      # Yes.  Nothing to do.
-      self.show("  %s (no change)" % fr)
-    else:
-      # No.  Copy it in and set the dirty flag.
-      self.show("  %s (importing)" % fr)
-      shutil.copyfile(fr, to)
-      self.dirty = True
-
-    return to
-
-  def resolve_macro(self, name, args_list):
-    if name in self.macros:
-      commands = self.macros[name]
-      def resolve_arg(m):
-        arg_num = int(m.group(1))-1
-        try:
-          arg = args_list[arg_num]
-        except IndexError:
-          raise Exception("Definition of macro %s uses #%d, but only %d arguments were given." % (name, arg_num+1, len(args_list)))
-        return arg
-
-      commands = re.sub(r'#(\d+)', resolve_arg, commands)
-      return self.split_commands(commands)
-
-    elif self.parent:
-      # No definition for this macro at this level.  Maybe our parent knows it?
-      return self.parent.resolve_macro(name, args_list)
-
-    else:
-      # No definition at this level, and no parent to ask.  Give up.
-      return None
-  
   def resolve_chunk(self, key):
     try:
       x = self.chunks[key]
@@ -85,39 +25,12 @@ class Frame:
         raise Exception("Chunk '%s' not found." % key)
 
   def execute(self, mash):
-    # Called when this frame's command and text have been fully read from the
-    # input file.  Executes the commands.
-    mash.frame_count += 1
-
-    # Are there any commands?  If not, ingore this frame.  Not sure why this
-    # would happen except at the very top level, or for frames that contain
-    # only comments.
-    if not self.commands:
-      return
-
-    # Is this a macro definition?  These are special because they consme *all*
-    # of the commands in the list.  The definition goes in the parent frame
-    # (rather than this one), because this frame probably only has the macro
-    # definition, and will be going away soon.
-    match = re.search(r'def ([a-zA-Z0-9_-]+): (.*)', self.commands)
-    if match:
-      name = match.group(1)
-      definition = match.group(2)
-      self.parent.macros[name] = definition
-      return
 
     # For things like "@abc/xyz", import that file, and replace with "xyz".
     self.text = re.sub(r'@@([^\n},\']*)', lambda m: self.import_and_mangle(mash, m.group(1)), self.text)
 
-    # Split the command list into individual commands.
-    command_list = self.split_commands(self.commands)
-
     # Loop through the commands we have.
     while command_list:
-      command = command_list[0]
-      command_list = command_list[1:]
-      command = command.strip()
-      mash.command_count += 1
 
       # For things like "@abc/def", import that file, and replace with "def".
       command = re.sub(r'@@([^\n},]*)', lambda m: self.import_and_mangle(mash, m.group(1)), command)
@@ -139,21 +52,6 @@ class Frame:
         self.parent.append_text(output)
         continue
 
-      # append: Print literal text into the current frame, at the end.
-      match = re.search(r"^append +(.*)", command)
-      if match:
-        output = match.group(1)
-        self.append_text(output)
-        continue
-
-      # prepend: Print literal text into the current frame, at the beginning.
-      match = re.search(r"^prepend +(.*)", command)
-      if match:
-        output = match.group(1)
-        self.prepend_text(output)
-        continue
-      
-      
       # Read a file (or files) and append their contents to the text of this
       # frame.
       match = re.search(r"^read +(.*)", command)
@@ -163,78 +61,6 @@ class Frame:
           f = open(filename, 'r')
           self.append_text(f.read())
           f.close()
-        continue
-
-      # purge: Remove files, unless they've been touched by a previous command.
-      match = re.search(r"^purge +(.*)", command)
-      if match:
-        for filename in glob.glob(match.group(1)):
-          if filename in mash.touched:
-            self.show("  " + filename + " (touched; leaving alone)")
-          else:
-            self.show("  " + filename + " (not touched; removing)")
-            os.remove(filename)
-
-        continue
-
-      # depend: Mark the frame dirty if given other files have been written
-      # elsewhere.
-      match = re.search(r"^depend +(.*)", command)
-      if match:
-        deps = match.group(1).strip()
-        for dep in deps.split(' '):
-          dep = dep.strip()
-          if dep in mash.written:
-            self.show("  (dep has changed; frame is dirty)")
-            self.dirty = True
-          else:
-            self.show("  (no change)")
-        continue
-
-      # emit: Note that a given file is being written (for example as an effect
-      # of an exec command) so that we can have dependencies on it later.
-      match = re.search(r"^emit +(.*)", command)
-      if match:
-        files_to_emit = match.group(1).strip()
-        for file_to_emit in files_to_emit.split(' '):
-          file_to_emit = file_to_emit.strip()
-          mash.written[file_to_emit] = True
-          mash.touched[file_to_emit] = True
-        continue
-
-      # Execute a shell command, allowing its output to go to the terminal in
-      # which mash is running, and without changing the text.  Complain if the
-      # command returns a non-zero (error) return code.
-      match = re.search(r"^exec +(.*)", command)
-      if match:
-        shell_command = match.group(1)
-        return_code = os.system(shell_command)
-        if return_code != 0:
-          raise Exception("Shell command '%s' failed with return code %d." % (shell_command, return_code))
-        continue
-
-      # Filter the text through a shell command.
-      match = re.search(r"^filter +(.*)", command)
-      if match:
-        shell_command = match.group(1)
-        p = subprocess.Popen(shell_command, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        self.text = p.communicate(input=self.text)[0]
-        if p.returncode != 0:
-          raise Exception("Filter command '%s' failed with return code %d." % (shell_command, p.returncode))
-        continue
-
-      # Strip leading and trailing spaces.
-      match = re.search(r"^strip", command)
-      if match:
-        self.text = self.text.strip()
-        continue
-
-      # Push our text, macros, and chunks up into the parent frame.
-      match = re.search(r"^push", command)
-      if match:
-        self.parent.append_text(self.text)
-        self.parent.macros.update(self.macros)
-        self.parent.chunks.update(self.chunks)
         continue
 
       # Include another mash file.
@@ -256,11 +82,6 @@ class Frame:
         mash.mash_string(self.text, self)
         continue
 
-
-      # Keep a file by copying it to the input directory.
-      match = re.search(r"^keep +(.*)", command)
-      if match:
-        continue
 
       # Import a file from the input directory into the build directory.
       match = re.search(r"^import +(.*)", command)
