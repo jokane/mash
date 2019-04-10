@@ -145,7 +145,7 @@ def keep(file_to_keep):
     target = os.path.join(keep_directory, file_to_keep)
     if os.path.exists(target):
       shutil.rmtree(target)
-    shutil.copytree2(file_to_keep, target)
+    shutil.copytree(file_to_keep, target)
   else:
     raise Exception("Don't know how to keep %s, which is neither file nor directory." % file_to_keep)
   
