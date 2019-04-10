@@ -143,6 +143,8 @@ def push(text=""):
 def keep(file_to_keep):
   """Copy a file or directory from the working directory to the keep
   directory."""
+  if not os.path.exists(keep_directory):
+    os.makedirs(keep_directory)
   if os.path.isfile(file_to_keep):
     shutil.copy2(file_to_keep, keep_directory)
   elif os.path.isdir(file_to_keep):
