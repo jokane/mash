@@ -32,6 +32,8 @@ prev_directory = os.path.join(original_directory, ".mash-prev")
 # This is the directory that should contain the completed output files.
 keep_directory = original_directory
 
+# This is a list of places we should search when importing a new file.
+import_search_directories = list(original_directory)
 
 # Move any existing build directory to be the previous directory.  Delete any
 # existing previous directory.
@@ -147,16 +149,20 @@ def keep(file_to_keep):
   else:
     raise Exception("Don't know how to keep %s, which is neither file nor directory." % file_to_keep)
   
-def imprt(pattern):
-  """Copy one or more files from the original directory to the build directory."""
+def imprt(fname):
+  """Copy one or more files to the build directory."""
+  # Figure out the source filename.
+  fr = None
+  for directory in import_search_directories:
+    x = os.path.join(directory, fname)
+    if os.path.exists(x):
+      fr = x
+      break
+  if fr is None:
+    raise Exception("Trying to import %s, but could not find it in any of these places: %s" % (fname, " ".join(import_search_directories)))
 
-  globs = glob.glob(os.path.join(original_directory,pattern))
-  if not globs:
-    raise Exception("Trying to import %s, but no files match." % pattern)
-  
-  for fname in globs:
-    fr = os.path.join(original_directory, fname)
-    to = os.path.join(build_directory, os.path.basename(fname))
+  # Figure out the destination filename.
+  to = os.path.join(build_directory, os.path.basename(fname))
 
   # Does this file exist already?
   if os.path.isfile(to) and filecmp.cmp(fr, to, False):
