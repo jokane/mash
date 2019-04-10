@@ -77,7 +77,7 @@ class Frame:
           return
       raise Exception("Trying to include %s, but could not find that file." % fname)
 
-    self.commands = re.sub(r'^include (.*)$', resolve_include, self.commands, re.MULTILINE)
+    self.commands = re.sub('(?m)^\s*include (.*)$', resolve_include, self.commands)
 
     # Actually execute the commands.
     mash.vars['_'] = self
