@@ -17,6 +17,7 @@ import sys
 
 # This is the directory where started.
 original_directory = os.getcwd()
+sys.path.append(original_directory)
 
 # This is the directory where we will do all of our work, execute commands,
 # etc.  This will be the current directory most of the time.
