@@ -93,8 +93,7 @@ def retrieve(target, *sources):
 
   ok = True
 
-  if not os.path.isfile(prev_target):
-    #print(target,"is not available.")
+  if not os.path.exists(prev_target):
     print("(%s):" % target, end='')
     ok = False
     target_time = None
@@ -112,7 +111,7 @@ def retrieve(target, *sources):
       print(" %s" % source, end='')
 
   print()
-  if ok: shutil.copy2(prev_target, build_directory)
+  if ok: shutil.move(prev_target, build_directory)
 
   return ok
 
@@ -173,7 +172,7 @@ def imprt(*fnames):
       print(fr)
       shutil.copy2(fr, to)
   
-  return fname
+  return os.path.basename(fname)
 
 def filter(shell_command):
   print(shell_command)
@@ -193,7 +192,7 @@ def unindent():
 
 
 def before_frame_hook():
-  # For things like "@abc/xyz", import that file and replace with "xyz".
+  # For things like "@@abc/xyz", import that file and replace with "xyz".
   def import_and_mangle(match):
     fr = match.group(1)
     fr = os.path.join(original_directory,fr)
