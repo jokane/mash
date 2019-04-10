@@ -6,13 +6,14 @@
 # will include this near the start. 
 
 import difflib
-import glob
 import filecmp
+import glob
 import hashlib
 import os
 import re
 import shutil
 import subprocess
+import sys
 
 # This is the directory where started.
 original_directory = os.getcwd()
@@ -20,6 +21,7 @@ original_directory = os.getcwd()
 # This is the directory where we will do all of our work, execute commands,
 # etc.  This will be the current directory most of the time.
 build_directory = os.path.join(original_directory, ".mash")
+sys.path.append(build_directory)
 
 # This is the build directory from the previous time through.  If nothing has
 # changed, then we can just copy things over from there instead of re-building
@@ -76,6 +78,9 @@ def save(target):
     # We don't have a file like this anywhere.  Actually save it.
     #print("Writing %d bytes to %s." % (len(_.text), target))
     print(_.text, file=open(target, 'w'), end='')
+ 
+def read(fname):
+  _.text += open(fname, 'r').read()
 
 def retrieve(target, *sources):
   """Check whether the given target file exists in the previous directory,
