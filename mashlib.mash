@@ -149,28 +149,29 @@ def keep(file_to_keep):
   else:
     raise Exception("Don't know how to keep %s, which is neither file nor directory." % file_to_keep)
   
-def imprt(fname):
+def imprt(*fnames):
   """Copy one or more files to the build directory."""
-  # Figure out the source filename.
-  fr = None
-  for directory in import_search_directories:
-    x = os.path.join(directory, fname)
-    if os.path.exists(x):
-      fr = x
-      break
-  if fr is None:
-    raise Exception("Trying to import %s, but could not find it in any of these places: %s" % (fname, " ".join(import_search_directories)))
+  for fname in fnames:
+    # Figure out the source filename.
+    fr = None
+    for directory in import_search_directories:
+      x = os.path.join(directory, fname)
+      if os.path.exists(x):
+        fr = x
+        break
+    if fr is None:
+      raise Exception("Trying to import %s, but could not find it in any of these places: %s" % (fname, " ".join(import_search_directories)))
 
-  # Figure out the destination filename.
-  to = os.path.join(build_directory, os.path.basename(fname))
+    # Figure out the destination filename.
+    to = os.path.join(build_directory, os.path.basename(fname))
 
-  # Does this file exist already?
-  if os.path.isfile(to) and filecmp.cmp(fr, to, False):
-    # Yes.  Nothing to do.
-    pass
-  else:
-    print(fr)
-    shutil.copy2(fr, to)
+    # Does this file exist already?
+    if os.path.isfile(to) and filecmp.cmp(fr, to, False):
+      # Yes.  Nothing to do.
+      pass
+    else:
+      print(fr)
+      shutil.copy2(fr, to)
   
   return fname
 
