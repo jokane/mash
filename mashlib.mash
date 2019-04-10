@@ -33,7 +33,7 @@ prev_directory = os.path.join(original_directory, ".mash-prev")
 keep_directory = original_directory
 
 # This is a list of places we should search when importing a new file.
-import_search_directories = list(original_directory)
+import_search_directories = [original_directory, ]
 
 # Move any existing build directory to be the previous directory.  Delete any
 # existing previous directory.
@@ -111,7 +111,12 @@ def retrieve(target, *sources):
       print(" %s" % source, end='')
 
   print()
-  if ok: shutil.move(prev_target, build_directory)
+
+  if ok:
+    if os.path.isfile(prev_target):
+      shutil.copy2(prev_target, build_directory)
+    else:
+      shutil.copytree(prev_target, os.path.join(build_directory, target))
 
   return ok
 

@@ -119,8 +119,6 @@
       [[[xfig("@@figs/stick.fig")]]]
     \end{center}
 
-    [[[imprt("figs/*.fig")]]]
-
     \subsection{BibTeX}
     [[[bib_entry() |||
       @book{abc,
