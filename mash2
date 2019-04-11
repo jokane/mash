@@ -34,9 +34,12 @@ import subprocess
 import time
 
 class Frame:
-  def __init__(self, _parent):
+  def __init__(self, _parent, file_name):
     # Remember our parent frame, or None if we're the root.
     self.parent = _parent
+
+    # Remember what file we come from.
+    self.file_name = file_name
 
     # The full contents of this frame, including commands and text, which will
     # be filled in as we go.
@@ -73,7 +76,7 @@ class Frame:
         x = os.path.join(directory, fname)
         if os.path.exists(x):
           print(x)
-          mash.mash_string(open(x, 'r').read(), self)
+          mash.mash_string(open(x, 'r').read(), Frame(self, x))
           return
       raise Exception("Trying to include %s, but could not find that file." % fname)
 
@@ -82,10 +85,13 @@ class Frame:
     # Actually execute the commands.
     mash.vars['_'] = self
     if "before_frame_hook" in mash.vars:
-      exec("before_frame_hook()", mash.vars, mash.vars)
-    exec(self.commands, mash.vars, mash.vars)
+      code = compile("before_frame_hook()", self.file_name, 'exec')
+      exec(code, mash.vars, mash.vars)
+    code = compile(self.commands, self.file_name, 'exec')
+    exec(code, mash.vars, mash.vars)
     if "after_frame_hook" in mash.vars:
-      exec("after_frame_hook()", mash.vars, mash.vars)
+      code = compile("after_frame_hook()", self.file_name, 'exec')
+      exec(code, mash.vars, mash.vars)
 
 def unindent(s):
   # Find the prefix that we want to remove.  It is the sequence
@@ -114,7 +120,7 @@ class Mash:
         # child of the current one.  We'll add the text in future
         # iterations of this loop, and execute it when we see the
         # closing delimiter.
-        current_frame = Frame(current_frame)
+        current_frame = Frame(current_frame, current_frame.file_name)
         text = text[3:]
       
       # Do we have a closing delimiter next?
@@ -173,10 +179,10 @@ class Mash:
     text = open(self.args.input_filename, 'r').read()
     
     if self.args.debug:
-      self.mash_string(text, Frame(None))
+      self.mash_string(text, Frame(None, self.args.input_filename))
     else:
       try:
-        self.mash_string(text, Frame(None))
+        self.mash_string(text, Frame(None, self.args.input_filename))
       except Exception as e:
         print("Error:", e)
         sys.exit(1)
