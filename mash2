@@ -158,7 +158,7 @@ class Mash:
     start_time = time.time()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument(dest='input_filename', help='input filename', nargs='?')
+    parser.add_argument(dest='input_filename', help='input filename', nargs='+')
     parser.add_argument('--debug', '-d', dest='debug', help='on error, show stack trace', action='store_true')
     parser.add_argument('--clean', '-c', dest='clean', action='store_true')
     self.args = parser.parse_args()
@@ -175,21 +175,24 @@ class Mash:
       parser.print_help()
       sys.exit(1)
     
-    self.frame_count = 1
-    self.included = set()
+    original_directory = os.getcwd()
+    for input_filename in self.args.input_filename:
+      os.chdir(original_directory)
+      self.frame_count = 1
+      self.included = set()
 
-    self.vars = dict()
+      self.vars = dict()
 
-    text = open(self.args.input_filename, 'r').read()
-    
-    if self.args.debug:
-      self.mash_string(text, Frame(None, self.args.input_filename))
-    else:
-      try:
-        self.mash_string(text, Frame(None, self.args.input_filename))
-      except Exception as e:
-        print("Error:", e)
-        sys.exit(1)
+      text = open(input_filename, 'r').read()
+      
+      if self.args.debug:
+        self.mash_string(text, Frame(None, input_filename))
+      else:
+        try:
+          self.mash_string(text, Frame(None, input_filename))
+        except Exception as e:
+          print("Error:", e)
+          sys.exit(1)
 
     end_time = time.time()
     print("%d frames; %0.1f seconds" % (self.frame_count, end_time - start_time))
