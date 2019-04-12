@@ -78,7 +78,7 @@ class Frame:
           print(x)
           mash.mash_string(open(x, 'r').read(), Frame(self, x))
           return
-      raise Exception("Trying to include %s, but could not find that file." % fname)
+      raise Exception("Trying to include %s, but could not find it in any of these places:\n%s" % (fname, '\n'.join(sys.path)))
 
     self.commands = re.sub('(?m)^\s*include (.*)$', resolve_include, self.commands)
 

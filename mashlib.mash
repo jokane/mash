@@ -166,7 +166,7 @@ def imprt(*fnames):
         fr = x
         break
     if fr is None:
-      raise Exception("Trying to import %s, but could not find it in any of these places: %s" % (fname, " ".join(import_search_directories)))
+      raise Exception("Trying to import %s, but could not find it in any of these places:\n %s" % (fname, '\n'.join(import_search_directories)))
 
     # Figure out the destination filename.
     to = os.path.join(build_directory, os.path.basename(fname))
@@ -199,14 +199,16 @@ def unindent():
 
 
 def before_frame_hook():
-  # For things like "[at][at]abc/xyz", import that file and replace with "xyz".
+  # For things like "[at][at]abc/xyz", import that file and replace with
+  # "xyz".  Note the need to avoid putting two @ symbols together here,
+  # because this code might run on itself.
   def import_and_mangle(match):
     fr = match.group(1)
     fr = os.path.join(original_directory,fr)
     to = imprt(fr)
     return to
-  _.text = re.sub(r'@@([^\n},\']*)', import_and_mangle, _.text)
-  _.commands = re.sub(r'@@([^\n},\'\"]*)', import_and_mangle, _.commands)
+  _.text = re.sub(r'@'+r'@([^\n},\']*)', import_and_mangle, _.text)
+  _.commands = re.sub(r'@'+r'@([^\n},\'\"]*)', import_and_mangle, _.commands)
 
 ]]]
 
