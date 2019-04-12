@@ -72,10 +72,13 @@ class Frame:
     # Execute it as mash code.
     def resolve_include(match):
       fname = match.group(1)
+      if fname in mash.included:
+        return
       for directory in sys.path:
         x = os.path.join(directory, fname)
         if os.path.exists(x):
           print(x)
+          mash.included.add(fname)
           mash.mash_string(open(x, 'r').read(), Frame(self, x))
           return
       raise Exception("Trying to include %s, but could not find it in any of these places:\n%s" % (fname, '\n'.join(sys.path)))
@@ -173,6 +176,7 @@ class Mash:
       sys.exit(1)
     
     self.frame_count = 1
+    self.included = set()
 
     self.vars = dict()
 
