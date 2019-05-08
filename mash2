@@ -45,6 +45,9 @@ class Frame:
     # be filled in as we go.
     self.contents = ""
 
+    self.commands = ''
+    self.text = ''
+
   def execute(self, mash):
     mash.frame_count += 1
 
@@ -67,23 +70,6 @@ class Frame:
     #print("commands:\n", self.commands)
     #print("text:\n", self.text)
 
-    # Check for and execute any special commands.
-    # 1. include <fname>: Search the path for a file with the given name.
-    # Execute it as mash code.
-    def resolve_include(match):
-      fname = match.group(1)
-      if fname in mash.included:
-        return
-      for directory in sys.path:
-        x = os.path.join(directory, fname)
-        if os.path.exists(x):
-          print(x)
-          mash.included.add(fname)
-          mash.mash_string(open(x, 'r').read(), Frame(self, x))
-          return
-      raise Exception("Trying to include %s, but could not find it in any of these places:\n%s" % (fname, '\n'.join(sys.path)))
-
-    self.commands = re.sub('(?m)^\s*include (.*)$', resolve_include, self.commands)
 
     # Actually execute the commands.
     mash.vars['_'] = self
@@ -116,6 +102,26 @@ class Mash:
     # Walk through the text, looking for child frames, consuming
     # the text from the local variable 'text' as we go.
     while text:
+      # Do we have an include command next?
+      match = re.search(r'^\[\[\[\s*include (.*?)\s*\]\]\]', text)
+      if match:
+        fname = match.group(1)
+        ok = False
+        for directory in sys.path:
+          x = os.path.join(directory, fname)
+          if os.path.exists(x):
+            print(x)
+            frame = Frame(current_frame, x)
+            self.mash_string(open(x, 'r').read(), frame)
+            current_frame.contents += frame.contents
+            ok = True
+            break
+
+        if not ok:
+          raise Exception("Trying to include %s, but could not find it in any of these places:\n%s" % (fname, '\n'.join(sys.path)))
+        text = text[len(match.group(0)):]
+        continue
+
       # Do we have an opening delimiter next?
       match = re.search(r"^\[\[\[", text)
       if match:
@@ -125,6 +131,7 @@ class Mash:
         # closing delimiter.
         current_frame = Frame(current_frame, current_frame.file_name)
         text = text[3:]
+        continue
       
       # Do we have a closing delimiter next?
       match = re.search(r"^\]\]\]", text)
@@ -136,7 +143,7 @@ class Mash:
         text = text[3:]
         continue
 
-      # Not seeing opening nor closing delimiters.  Grab as much ordinary text as
+      # Not seeing anything special.  Grab as much ordinary text as
       # we can.  At least one character, until we see [ or ] again.
       match = re.search(r"^(.[^\[\]]*)", text, re.DOTALL)
       current_frame.contents += match.group(0)
@@ -157,42 +164,32 @@ class Mash:
     """ This is the 'main' function."""
     start_time = time.time()
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument(dest='input_filename', help='input filename', nargs='+')
-    parser.add_argument('--debug', '-d', dest='debug', help='on error, show stack trace', action='store_true')
-    parser.add_argument('--clean', '-c', dest='clean', action='store_true')
-    self.args = parser.parse_args()
-
-    if self.args.clean:
+    
+    if sys.argv[1] == '-c':
       if os.path.exists(".mash"):
         shutil.rmtree(".mash")
       if os.path.exists(".mash-prev"):
         shutil.rmtree(".mash-prev")
-      if self.args.input_filename is None:
+      if len(sys.argv) == 2:
         return
+      sys.argv.pop(1)
 
-    if self.args.input_filename is None:
-      parser.print_help()
-      sys.exit(1)
+    input_filename = sys.argv[1]
     
     original_directory = os.getcwd()
-    for input_filename in self.args.input_filename:
-      os.chdir(original_directory)
-      self.frame_count = 1
-      self.included = set()
 
-      self.vars = dict()
+    self.frame_count = 1
 
-      text = open(input_filename, 'r').read()
+    self.vars = dict()
+
+    text = open(input_filename, 'r').read()
       
-      if self.args.debug:
-        self.mash_string(text, Frame(None, input_filename))
-      else:
-        try:
-          self.mash_string(text, Frame(None, input_filename))
-        except Exception as e:
-          print("Error:", e)
-          sys.exit(1)
+    try:
+      self.mash_string(text, Frame(None, input_filename))
+    except subprocess.CalledProcessError as e:
+      print(e)
+      print(e.stdout)
+      print(e.stderr)
 
     end_time = time.time()
     print("%d frames; %0.1f seconds" % (self.frame_count, end_time - start_time))
