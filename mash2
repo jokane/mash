@@ -32,6 +32,7 @@ import os
 import shutil
 import subprocess
 import time
+import textwrap
 
 class Frame:
   def __init__(self, _parent, file_name):
@@ -65,7 +66,7 @@ class Frame:
     # Fix the indentation of the commands.  This allows us to
     # write python code that is _all_ indented, without annoying
     # the interpreter.
-    self.commands = unindent(self.commands)
+    self.commands = textwrap.dedent(self.commands)
 
     #print("commands:\n", self.commands)
     #print("text:\n", self.text)
