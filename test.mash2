@@ -1,48 +1,10 @@
 [[[include mashlib.mash]]]
 
+[[[include latex.mash]]]
+
 [[[
   import re
 
-  def latex(name):
-    # Write the document.
-    save(name + ".tex") 
-
-    # Build a list of dependencies.
-    deps = [name + ".tex"]
-    for match in re.finditer(r'\\includegraphics(\[.*\])?{([^}]*)}', _.text):
-      deps.append(match.group(2))
-
-    # Check to see if we really need to build.
-    if not retrieve(name+".pdf", *deps):
-      # Yes.  Run pdflatex over and over until the log stops changing.
-      last_log = ''
-      bibtex_done = False
-      while True:
-        shell("pdflatex -interaction=batchmode -file-line-error -halt-on-error %s > /dev/null" % name)
-        log = open(name+'.log', 'r').read()
-        if not bibtex_done:
-          aux = open(name+'.aux', 'r').read()
-          if re.search('citation', aux):
-            shell("bibtex -terse %s" % name)
-            bibtex_done = True
-        if log == last_log: break
-        last_log = log
-
-    # Done.
-    keep(name+".pdf") 
-
-  def dot(args=''):
-    name = anon()
-    save(name + ".dot")
-    if not retrieve(name+".pdf", name+".dot"):
-      shell("dot -Tpdf %s.dot -o %s.pdf" % (name, name))
-    push("\includegraphics[%s]{%s.pdf}" % (args, name))
-
-  def xfig(fname_fig, args=''):
-    fname_pdf = re.sub("\.fig", ".pdf", fname_fig)
-    if not retrieve(fname_pdf, fname_fig):
-      shell("fig2dev -L pdf %s %s" % (fname_fig, fname_pdf))
-    push("\includegraphics[%s]{%s}" % (args, fname_pdf))
 
   bibliography_entries = ""
   def bib_entry():
