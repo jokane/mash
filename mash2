@@ -83,17 +83,6 @@ class Frame:
       code = compile("after_frame_hook()", self.file_name, 'exec')
       exec(code, mash.vars, mash.vars)
 
-def unindent(s):
-  # Find the prefix that we want to remove.  It is the sequence
-  # of tabs or spaces that preceeds the first real character.
-  match = re.search(r'([ \t]*)[^ \t\n]', s)
-
-  # If we found a prefix, remove it from the start of every line.
-  if match:
-    prefix = match.group(1)
-    s = re.sub('\n' + prefix, '\n', s)
-  return s
-
 class Mash:
   def mash_string(self, text, top_frame):
     # The current frame for whatever we're parsing now.  The top

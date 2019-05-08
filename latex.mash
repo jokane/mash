@@ -1,0 +1,67 @@
+[[[ include mashlib.mash ]]]
+
+[[[
+
+  def latex(name, compiler='pdflatex', ignore_deps=list(), keep_pdf=True, callback=None):
+    # Write the document.
+    save(name + ".tex") 
+
+    # Build a list of dependencies.
+    deps = [name + ".tex"]
+    for match in re.finditer(r'\\includegraphics(\[.*?\])?{([^}]*)}', _.text, re.DOTALL):
+      deps.append(match.group(2))
+
+    for match in re.finditer(r'\\lstinputlisting(\[.*?\])?{([^}]*)}', _.text, re.DOTALL):
+      deps.append(match.group(2))
+
+    deps = [item for item in deps if item not in ignore_deps]
+
+    # Check to see if we really need to build.
+    if not retrieve(name+".pdf", *deps):
+      # Yes.  Run the compiler over and over until the log stops changing.
+      last_log = ''
+      bibtex_done = False
+      makeindex_done = False
+      callback_done = False
+      while True:
+        try:
+          shell(compiler + " -interaction=batchmode -file-line-error -halt-on-error %s" % name)
+        except subprocess.CalledProcessError as e:
+          e.stderr = open(name + '.log', 'r').read()
+          raise e
+        log = open(name+'.log', 'r').read()
+        if not callback_done and callable(callback):
+          callback()
+        if not bibtex_done:
+          aux = open(name+'.aux', 'r').read()
+          if re.search('citation', aux):
+            shell("bibtex -terse %s" % name)
+            bibtex_done = True
+        if not makeindex_done and os.path.isfile(name+".idx"):
+          shell("makeindex %s.idx" % name)
+          makeindex_done = True
+          
+        if log == last_log: break
+        last_log = log
+    if keep_pdf:
+      keep(name+".pdf")
+  
+  def dot(name=None, args=''):
+    if not name:
+      name = anon()
+    name_dot = name+".dot"
+    name_pdf = name+".pdf"
+    save(name_dot)
+    if not retrieve(name_pdf, name_dot):
+      shell("dot -Tpdf %s > %s" % (name_dot, name_pdf))
+    push("\\includegraphics[%s]{%s}" % (args, name_pdf))
+
+  def xfig(fname_fig, args=''):
+    fname_pdf = re.sub("\.fig", ".pdf", fname_fig)
+    if not retrieve(fname_pdf, fname_fig):
+      shell("fig2dev -L pdf %s %s" % (fname_fig, fname_pdf))
+    push("\includegraphics[%s]{%s}" % (args, fname_pdf))
+
+    
+
+]]]
