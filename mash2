@@ -66,10 +66,7 @@ class Frame:
     # Fix the indentation of the commands.  This allows us to
     # write python code that is _all_ indented, without annoying
     # the interpreter.
-    self.commands = textwrap.dedent(self.commands)
-
-    #print("commands:\n", self.commands)
-    #print("text:\n", self.text)
+    self.commands = unindent(self.commands)
 
 
     # Actually execute the commands.
@@ -82,6 +79,19 @@ class Frame:
     if "after_frame_hook" in mash.vars:
       code = compile("after_frame_hook()", self.file_name, 'exec')
       exec(code, mash.vars, mash.vars)
+
+def unindent(s):
+  # Find the prefix that we want to remove.  It is the sequence
+  # of tabs or spaces that preceeds the first real character.
+  match = re.search(r'([ \t]*)[^ \t\n]', s, re.M)
+
+  # If we found a prefix, remove it from the start of every line.
+  if match:
+    prefix = match.group(1)
+    s = re.sub('\n' + prefix, '\n', s)
+    s = re.sub('^' + prefix, '', s)
+  return s
+
 
 class Mash:
   def mash_string(self, text, top_frame):
