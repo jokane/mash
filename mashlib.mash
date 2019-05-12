@@ -134,7 +134,7 @@ def anon():
 def shell(command):
   """Execute the given command in a shell.  Raise subprocess.CalledProcessError if the command gives a non-zero return code.  Return the CompletedProcess object, which has stdout and stderr attributes."""
   print("  ", command)
-  return subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
+  return subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60000)
 
 
 def push(text=""):

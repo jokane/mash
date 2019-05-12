@@ -2,7 +2,7 @@
 
 [[[
 
-  def latex(name, compiler='pdflatex', ignore_deps=list(), keep_pdf=True, callback=None):
+  def latex(name, compiler='pdflatex', ignore_deps=list(), keep_pdf=True, callback=None, max_compiles=None):
     # Write the document.
     save(name + ".tex") 
 
@@ -23,9 +23,11 @@
       bibtex_done = False
       makeindex_done = False
       callback_done = False
+      compiles = 0
       while True:
         try:
           shell(compiler + " -interaction=batchmode -file-line-error -halt-on-error %s" % name)
+          compiles+=1
         except subprocess.CalledProcessError as e:
           e.stderr = open(name + '.log', 'r').read()
           raise e
@@ -40,6 +42,7 @@
         if not makeindex_done and os.path.isfile(name+".idx"):
           shell("makeindex %s.idx" % name)
           makeindex_done = True
+        if max_compiles and compiles >= max_compiles: break
           
         if log == last_log: break
         last_log = log
@@ -56,11 +59,50 @@
       shell("dot -Tpdf %s > %s" % (name_dot, name_pdf))
     push("\\includegraphics[%s]{%s}" % (args, name_pdf))
 
-  def xfig(fname_fig, args=''):
-    fname_pdf = re.sub("\.fig", ".pdf", fname_fig)
-    if not retrieve(fname_pdf, fname_fig):
-      shell("fig2dev -L pdf %s %s" % (fname_fig, fname_pdf))
-    push("\includegraphics[%s]{%s}" % (args, fname_pdf))
+  def xfig(fname_fig, args='', method='pdf'):
+    """
+    Insert an xfig diagram.
+    """
+
+    # TODO: A few useful things like layers are implemented in the
+    # jokane-talk.mash version of this function.
+
+    fig_source = open(fname_fig, 'r').read()
+
+    # Find any referenes to embedded images.
+    deps = list()
+    for match in re.finditer(r'^(2 5 ([0-9\.-]*\s+){13}[0-9\.-]*$\s*\d\s*(.*))', fig_source, re.MULTILINE):
+      pic = match.group(3)
+      imprt(pic)
+      deps.append(pic)
+  
+    if method == 'pdf':
+      # Convert directly to PDF.
+      fname_pdf = re.sub("\.fig", ".pdf", fname_fig)
+      if not retrieve(fname_pdf, fname_fig, *deps):
+        shell("fig2dev -L pdf %s %s" % (fname_fig, fname_pdf))
+      push("\includegraphics[%s]{%s}" % (args, fname_pdf))
+    elif method == 'pdftex':
+      # Convert to the two part pdf/latex form.
+      if args != '':
+        raise Exception(r"Don't know what to do with args in xfig() with method pdftex.  Maybe wrap in a \resizebox instead?")
+      fname_pdf = re.sub("\.fig", ".pdf", fname_fig)
+      fname_tex = re.sub("\.fig", ".tex", fname_fig)
+      if not retrieve(fname_pdf, fname_fig, *deps) or not retrieve(fname_tex, fname_fig, *deps):
+        shell("fig2dev -L pdftex %s > %s" % (fname_fig, fname_pdf))
+        shell("fig2dev -L pdftex_t -p %s %s > %s" % (fname_pdf, fname_fig, fname_tex))
+      push("\input{%s}" % (fname_tex, ))
+    elif method == 'tikz':
+      # Convert to a jangle of tikz code.
+      # (This gave some strange errors...)
+      if args != '':
+        raise Exception(r"Don't know what to do with args in xfig() with method pdftex.  Maybe wrap in a \resizebox instead?")
+      fname_tex = re.sub("\.fig", ".tex", fname_fig)
+      if not retrieve(fname_tex, fname_fig, *deps):
+        shell("fig2dev -L tikz %s %s" % (fname_fig, fname_tex))
+      push("\input{%s}" % (fname_tex, ))
+    else:
+      raise Exception("Unknown method for xfig(): " + method)
 
     
 

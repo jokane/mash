@@ -165,16 +165,20 @@ class Mash:
     start_time = time.time()
 
     
-    if sys.argv[1] == '-c':
+    if '-c' in sys.argv:
       if os.path.exists(".mash"):
         shutil.rmtree(".mash")
       if os.path.exists(".mash-prev"):
         shutil.rmtree(".mash-prev")
-      if len(sys.argv) == 2:
+      sys.argv.remove('-c')
+      if len(sys.argv) == 1:
         return
-      sys.argv.pop(1)
 
-    input_filename = sys.argv[1]
+    if len(sys.argv) == 1:
+      print('[reading from stdin]')
+      input_filename = '/dev/stdin'
+    else:
+      input_filename = sys.argv[1]
     
     original_directory = os.getcwd()
 
