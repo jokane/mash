@@ -1,3 +1,4 @@
+#!/usr/bin/env mash
 [[[include mashlib.mash]]]
 
 [[[include latex.mash]]]
