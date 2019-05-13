@@ -131,10 +131,14 @@ def anon():
   global _
   return hashlib.sha1(_.text.encode('UTF-8')).hexdigest()[:7]
 
-def shell(command):
-  """Execute the given command in a shell.  Raise subprocess.CalledProcessError if the command gives a non-zero return code.  Return the CompletedProcess object, which has stdout and stderr attributes."""
+def shell(command, stdin=None):
+  """
+  Execute the given command in a shell.  Raise subprocess.CalledProcessError
+  if the command gives a non-zero return code.  Return the CompletedProcess
+  object, which has stdout and stderr attributes.
+  """
   print("  ", command)
-  return subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60000)
+  return subprocess.run(command, shell=True, check=True, input=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60000)
 
 
 def push(text=""):
@@ -185,12 +189,13 @@ def imprt(*fnames):
   
   return os.path.basename(fname)
 
-def filter(shell_command):
-  print(shell_command)
-  p = subprocess.Popen(shell_command, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-  _.text = p.communicate(input=_.text.encode('UTF-8'))[0].decode('UTF-8')
-  if p.returncode != 0:
-    raise Exception("Filter command '%s' failed with return code %d." % (shell_command, p.returncode))
+def filter(command):
+  """
+  Execute the given command in a shell, giving the contents of this frame as
+  standard input.  Replace the contents of this frame with the output.
+  """
+  result = shell(command, stdin=_.text.encode('utf-8'))
+  _.text = result.stdout
 
 def strip():
   _.text = _.text.rstrip()
