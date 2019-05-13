@@ -105,5 +105,12 @@
       raise Exception("Unknown method for xfig(): " + method)
 
     
+  def spell_check():
+    """
+    Run aspell on every file with a .mash extension in the original directory.
+    """
+    for file_name in glob.glob(os.path.join(original_directory, '*.mash')):
+      os.system("aspell check --home-dir=[[[push(original_directory)]]] --keymapping ispell " + file_name)
+      
 
 ]]]
