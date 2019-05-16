@@ -13,7 +13,8 @@
     dep_patterns = [
       r'\\includegraphics(\[.*?\])?{(?P<dep>[^}]*)}',
       r'\\lstinputlisting(\[.*?\])?{(?P<dep>[^}]*)}',
-      r'\\input{(?P<dep>[^}]*)}'
+      r'\\input{(?P<dep>[^}]*)}',
+      r'\\includepdf{(?P<dep>[^}]*)}'
     ]
 
     deps = [name + ".tex"]
