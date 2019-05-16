@@ -111,21 +111,19 @@ def retrieve(target, *sources):
   ok = True
 
   if not os.path.exists(prev_target):
-    print("(%s):" % target, end='')
+    print("(%s): [does not exist]" % target, end='')
     ok = False
     target_time = None
   else:
     print("%s:" % target, end='')
     target_time = os.path.getmtime(prev_target)
-
-
-  for source in sources:
-    source_time = os.path.getmtime(source)
-    if target_time is None or source_time > target_time:
-      print(" (%s)" % source, end='')
-      ok = False
-    else:
-      print(" %s" % source, end='')
+    for source in sources:
+      source_time = os.path.getmtime(source)
+      if target_time is not None and source_time > target_time:
+        print(" (%s)" % source, end='')
+        ok = False
+      else:
+        print(" %s" % source, end='')
 
   print()
 
