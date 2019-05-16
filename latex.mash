@@ -7,12 +7,19 @@
     save(name + ".tex") 
 
     # Build a list of dependencies.
-    deps = [name + ".tex"]
-    for match in re.finditer(r'\\includegraphics(\[.*?\])?{([^}]*)}', _.text, re.DOTALL):
-      deps.append(match.group(2))
+    
+    # Regular expressions whose matches give us dependencies.  Each one should
+    # have a group named 'dep' that gives the name of the depended-upon file.
+    dep_patterns = [
+      r'\\includegraphics(\[.*?\])?{(?P<dep>[^}]*)}',
+      r'\\lstinputlisting(\[.*?\])?{(?P<dep>[^}]*)}',
+      r'\\input{(?P<dep>[^}]*)}'
+    ]
 
-    for match in re.finditer(r'\\lstinputlisting(\[.*?\])?{([^}]*)}', _.text, re.DOTALL):
-      deps.append(match.group(2))
+    deps = [name + ".tex"]
+    for pattern in dep_patterns:
+      for match in re.finditer(pattern, _.text, re.DOTALL):
+        deps.append(match.group('dep'))
 
     deps = [item for item in deps if item not in ignore_deps]
 
@@ -36,7 +43,7 @@
           callback()
         if not bibtex_done:
           aux = open(name+'.aux', 'r').read()
-          if re.search('citation', aux):
+          if re.search(r'\\citation', aux):
             shell("bibtex -terse %s" % name)
             bibtex_done = True
         if not makeindex_done and os.path.isfile(name+".idx"):
@@ -94,7 +101,7 @@
       push("\input{%s}" % (fname_tex, ))
     elif method == 'tikz':
       # Convert to a jangle of tikz code.
-      # (This gave some strange errors...)
+      # (This gave some strange compile errors...)
       if args != '':
         raise Exception(r"Don't know what to do with args in xfig() with method pdftex.  Maybe wrap in a \resizebox instead?")
       fname_tex = re.sub("\.fig", ".tex", fname_fig)
