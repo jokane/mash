@@ -25,7 +25,7 @@
     deps = [item for item in deps if item not in ignore_deps]
 
     # Check to see if we really need to build.
-    if not retrieve(name+".pdf", *deps):
+    if not recall(name+".pdf", *deps):
       # Yes.  Run the compiler over and over until the log stops changing.
       last_log = ''
       bibtex_done = False
@@ -63,7 +63,7 @@
     name_dot = name+".dot"
     name_pdf = name+".pdf"
     save(name_dot)
-    if not retrieve(name_pdf, name_dot):
+    if not recall(name_pdf, name_dot):
       shell("dot -Tpdf %s > %s" % (name_dot, name_pdf))
     push("\\includegraphics[%s]{%s}" % (args, name_pdf))
 
@@ -87,7 +87,7 @@
     if method == 'pdf':
       # Convert directly to PDF.
       fname_pdf = re.sub("\.fig", ".pdf", fname_fig)
-      if not retrieve(fname_pdf, fname_fig, *deps):
+      if not recall(fname_pdf, fname_fig, *deps):
         shell("fig2dev -L pdf %s %s" % (fname_fig, fname_pdf))
       push("\includegraphics[%s]{%s}" % (args, fname_pdf))
     elif method == 'pdftex':
@@ -96,7 +96,7 @@
         raise Exception(r"Don't know what to do with args in xfig() with method pdftex.  Maybe wrap in a \resizebox instead?")
       fname_pdf = re.sub("\.fig", ".pdf", fname_fig)
       fname_tex = re.sub("\.fig", ".tex", fname_fig)
-      if not retrieve(fname_pdf, fname_fig, *deps) or not retrieve(fname_tex, fname_fig, *deps):
+      if not recall(fname_pdf, fname_fig, *deps) or not recall(fname_tex, fname_fig, *deps):
         shell("fig2dev -L pdftex %s > %s" % (fname_fig, fname_pdf))
         shell("fig2dev -L pdftex_t -p %s %s > %s" % (fname_pdf, fname_fig, fname_tex))
       push("\input{%s}" % (fname_tex, ))
@@ -106,7 +106,7 @@
       if args != '':
         raise Exception(r"Don't know what to do with args in xfig() with method pdftex.  Maybe wrap in a \resizebox instead?")
       fname_tex = re.sub("\.fig", ".tex", fname_fig)
-      if not retrieve(fname_tex, fname_fig, *deps):
+      if not recall(fname_tex, fname_fig, *deps):
         shell("fig2dev -L tikz %s %s" % (fname_fig, fname_tex))
       push("\input{%s}" % (fname_tex, ))
     else:

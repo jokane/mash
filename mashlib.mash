@@ -19,6 +19,9 @@ import sys
 try:
   mashlib_initialized
 except NameError:
+  mashlib_initialized = False
+
+if not mashlib_initialized:
   mashlib_initialized = True
   # This is the directory where started.
   original_directory = os.getcwd()
@@ -29,10 +32,9 @@ except NameError:
   build_directory = os.path.join(original_directory, ".mash")
   sys.path.append(build_directory)
 
-  # This is the build directory from the previous time through.  If nothing
-  # has changed, then we can just copy things over from there instead of
-  # re-building them.
-  prev_directory = os.path.join(original_directory, ".mash-prev")
+  # This directory has things built in previous runs.  If nothing has changed,
+  # then we can just copy things over from there instead of re-building them.
+  archive_directory = os.path.join(original_directory, ".mash-archive")
 
   # This is the directory that should contain the completed output files.
   keep_directory = original_directory
@@ -40,15 +42,19 @@ except NameError:
   # This is a list of places we should search when importing a new file.
   import_search_directories = [original_directory, ]
 
-  # Move any existing build directory to be the previous directory.  Delete
-  # any existing previous directory.
-  if os.path.exists(prev_directory):
-    #print("Removing", prev_directory)
-    shutil.rmtree(prev_directory)
-
+  # Move anything from the existing build directory to be the archive directory.
   if os.path.exists(build_directory):
-    #print("Moving", build_directory, "to", prev_directory)
-    shutil.move(build_directory, prev_directory)
+    for file_name in os.listdir(build_directory):
+      if not os.path.exists(archive_directory):
+        os.makedirs(archive_directory)
+      full_file_name = os.path.join(build_directory, file_name)
+      full_file_name_archive = os.path.join(archive_directory, file_name)
+      if os.path.isdir(full_file_name_archive):
+        shutil.rmtree(full_file_name_archive)
+      #print("%s --> %s" % (full_file_name, archive_directory))
+      shutil.move(full_file_name, os.path.join(archive_directory, file_name))
+
+
 
   # Make sure we have a build directory and that it's the current/working
   # directory.
@@ -59,7 +65,7 @@ except NameError:
 
 def save(target, contents=None):
   """Ensure that the current contents of this frame exist in the build
-  directory as a file with the given name.  Use an old copy from the previous
+  directory as a file with the given name.  Use an old copy from the archive
   directory if possible."""
   global _
   
@@ -78,21 +84,21 @@ def save(target, contents=None):
   else:
     bin_mode_flag = ''
 
-  # Check for an identically-named, identical-contents file in the previous
+  # Check for an identically-named, identical-contents file in the archive
   # directory.
-  prev_name = os.path.join(prev_directory, target)
+  archive_name = os.path.join(archive_directory, target)
   try:
-    existing_contents = open(prev_name, 'r' + bin_mode_flag).read()
+    existing_contents = open(archive_name, 'r' + bin_mode_flag).read()
     exists_already = (existing_contents == contents)
   except IOError as e:
     exists_already = False
 
   if exists_already:
-    # We have this exact file in the previous directory.  Copy it instead of
+    # We have this exact file in the archive directory.  Copy it instead of
     # saving directly.  This keeps the timestamp intact, which can help us
     # tell elsewhere if things need to be rebuilt.
-    #print("Using %s from previous build." % target)
-    shutil.copy2(prev_name, target)
+    #print("Using %s from archive." % target)
+    shutil.copy2(archive_name, target)
 
   else:
     # We don't have a file like this anywhere.  Actually save it.
@@ -102,21 +108,21 @@ def save(target, contents=None):
 def read(fname):
   _.text += open(fname, 'r').read()
 
-def retrieve(target, *sources):
-  """Check whether the given target file exists in the previous directory,
+def recall(target, *sources):
+  """Check whether the given target file exists in the archive directory,
   and if so, if it's newer than all of the given sources.  If so, copy it
   over and return True.  If not, do nothing and return False."""
-  prev_target = os.path.join(prev_directory, target)
+  archive_target = os.path.join(archive_directory, target)
 
   ok = True
 
-  if not os.path.exists(prev_target):
+  if not os.path.exists(archive_target):
     print("(%s): [does not exist]" % target, end='')
     ok = False
     target_time = None
   else:
     print("%s:" % target, end='')
-    target_time = os.path.getmtime(prev_target)
+    target_time = os.path.getmtime(archive_target)
     for source in sources:
       source_time = os.path.getmtime(source)
       if target_time is not None and source_time > target_time:
@@ -128,10 +134,10 @@ def retrieve(target, *sources):
   print()
 
   if ok:
-    if os.path.isfile(prev_target):
-      shutil.copy2(prev_target, build_directory)
+    if os.path.isfile(archive_target):
+      shutil.copy2(archive_target, build_directory)
     else:
-      shutil.copytree(prev_target, os.path.join(build_directory, target))
+      shutil.copytree(archive_target, os.path.join(build_directory, target))
 
   return ok
 

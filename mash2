@@ -167,8 +167,8 @@ class Mash:
     if '-c' in sys.argv:
       if os.path.exists(".mash"):
         shutil.rmtree(".mash")
-      if os.path.exists(".mash-prev"):
-        shutil.rmtree(".mash-prev")
+      if os.path.exists(".mash-archive"):
+        shutil.rmtree(".mash-archive")
       sys.argv.remove('-c')
       if len(sys.argv) == 1:
         return
