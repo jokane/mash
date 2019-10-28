@@ -14,7 +14,8 @@
       r'\\includegraphics(\[.*?\])?{(?P<dep>[^}]*)}',
       r'\\lstinputlisting(\[.*?\])?{(?P<dep>[^}]*)}',
       r'\\input{(?P<dep>[^}]*)}',
-      r'\\includepdf{(?P<dep>[^}]*)}'
+      r'\\includepdf{(?P<dep>[^}]*)}',
+      r'% dep (?P<dep>[^\n]*)'
     ]
 
     deps = [name + ".tex"]
@@ -54,6 +55,10 @@
           
         if log == last_log: break
         last_log = log
+
+      if compiler == 'latex':
+        shell('dvipdf %s.dvi' % name)
+
     if keep_pdf:
       keep(name+".pdf")
   
@@ -66,6 +71,20 @@
     if not recall(name_pdf, name_dot):
       shell("dot -Tpdf %s > %s" % (name_dot, name_pdf))
     push("\\includegraphics[%s]{%s}" % (args, name_pdf))
+
+  def xcf(name, args=''):
+    name_xcf = name+".xcf"
+    name_eps = name+".eps"
+    if not recall(name_eps, name_xcf):
+      shell("convert %s %s" % (name_xcf, name_eps))
+    push("\\includegraphics[%s]{%s}" % (args, name_eps))
+
+  def png(name, args=''):
+    name_png = name+".png"
+    name_eps = name+".eps"
+    if not recall(name_eps, name_png):
+      shell("convert %s %s" % (name_png, name_eps))
+    push("\\includegraphics[%s]{%s}" % (args, name_eps))
 
   def xfig(fname_fig, args='', method='pdf'):
     """
@@ -113,12 +132,5 @@
       raise Exception("Unknown method for xfig(): " + method)
 
     
-  def spell_check():
-    """
-    Run aspell on every file with a .mash extension in the original directory.
-    """
-    for file_name in glob.glob(os.path.join(original_directory, '*.mash')):
-      os.system("aspell check --home-dir=[[[push(original_directory)]]] --keymapping ispell " + file_name)
-      
 
 ]]]

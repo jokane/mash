@@ -123,13 +123,17 @@ def recall(target, *sources):
   else:
     print("%s:" % target, end='')
     target_time = os.path.getmtime(archive_target)
-    for source in sources:
-      source_time = os.path.getmtime(source)
-      if target_time is not None and source_time > target_time:
-        print(" (%s)" % source, end='')
-        ok = False
-      else:
-        print(" %s" % source, end='')
+    if sources:
+      for source in sources:
+        source_time = os.path.getmtime(source)
+        if target_time is not None and source_time > target_time:
+          print(" (%s)" % source, end='')
+          ok = False
+        else:
+          print(" %s" % source, end='')
+    else:
+      print(" [no sources]")
+
 
   print()
 
@@ -137,6 +141,8 @@ def recall(target, *sources):
     if os.path.isfile(archive_target):
       shutil.copy2(archive_target, build_directory)
     else:
+      if os.path.exists(target):
+        shutil.rmtree(target)
       shutil.copytree(archive_target, os.path.join(build_directory, target))
 
   return ok
@@ -160,7 +166,7 @@ def shell(command, stdin=None):
 def push(text=""):
   global _
   if text:
-    _.parent.contents += text
+    _.parent.contents += str(text)
   else:
     _.parent.contents += _.text
 
@@ -177,6 +183,7 @@ def keep(file_to_keep):
       shutil.rmtree(target)
     shutil.copytree(file_to_keep, target)
   else:
+    print(file_to_keep)
     raise Exception("Don't know how to keep %s, which is neither file nor directory." % file_to_keep)
   
 def imprt(*fnames):
@@ -234,6 +241,14 @@ def before_frame_hook():
     return to
   _.text = re.sub(r'@'+r'@([^\n},\']*)', import_and_mangle, _.text)
   _.commands = re.sub(r'@'+r'@([^\n},\'\"]*)', import_and_mangle, _.commands)
+
+def spell_check():
+  """
+  Run aspell on every file with a .mash extension in the original directory.
+  """
+  for file_name in glob.glob(os.path.join(original_directory, '*.mash')):
+    os.system("aspell check --home-dir=" + original_directory + " --keymapping ispell " + file_name)
+    
 
 ]]]
 
