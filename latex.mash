@@ -107,7 +107,7 @@
       # Convert directly to PDF.
       fname_pdf = re.sub("\.fig", ".pdf", fname_fig)
       if not recall(fname_pdf, fname_fig, *deps):
-        shell("fig2dev -L pdf %s %s" % (fname_fig, fname_pdf))
+        shell("fig2dev -L pdf -O %s %s" % (fname_fig, fname_pdf))
       push("\includegraphics[%s]{%s}" % (args, fname_pdf))
     elif method == 'pdftex':
       # Convert to the two part pdf/latex form.
@@ -116,8 +116,8 @@
       fname_pdf = re.sub("\.fig", ".pdf", fname_fig)
       fname_tex = re.sub("\.fig", ".tex", fname_fig)
       if not recall(fname_pdf, fname_fig, *deps) or not recall(fname_tex, fname_fig, *deps):
-        shell("fig2dev -L pdftex %s > %s" % (fname_fig, fname_pdf))
-        shell("fig2dev -L pdftex_t -p %s %s > %s" % (fname_pdf, fname_fig, fname_tex))
+        shell("fig2dev -L pdftex -O %s > %s" % (fname_fig, fname_pdf))
+        shell("fig2dev -L pdftex_t -O -p %s %s > %s" % (fname_pdf, fname_fig, fname_tex))
       push("\input{%s}" % (fname_tex, ))
     elif method == 'tikz':
       # Convert to a jangle of tikz code.
