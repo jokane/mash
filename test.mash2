@@ -127,7 +127,7 @@
         unindent();
         name = anon();
         save(name+".py")
-        if not retrieve(name+".tex", name+".py"):
+        if not recall(name+".tex", name+".py"):
           shell("python %s > %s" % (name+".py", name+".tex"))
         push("\input{%s.tex}" % name)
     ]]]
