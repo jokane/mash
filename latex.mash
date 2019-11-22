@@ -61,16 +61,23 @@
 
     if keep_pdf:
       keep(name+".pdf")
-  
-  def dot(name=None, args=''):
+
+  def dot(name=None, via_fig=False, args='', method='pdftex'):
     if not name:
       name = anon()
     name_dot = name+".dot"
+    name_fig = name+".fig"
     name_pdf = name+".pdf"
+    name_eps = name+".eps"
     save(name_dot)
-    if not recall(name_pdf, name_dot):
-      shell("dot -Tpdf %s > %s" % (name_dot, name_pdf))
-    push("\\includegraphics[%s]{%s}" % (args, name_pdf))
+    if via_fig:
+      if not recall(name_fig, name_dot):
+        shell("dot -Tfig %s > %s" % (name_dot, name_fig))
+      xfig(name_fig, args, method=method)
+    else:
+      if not recall(name_pdf, name_dot):
+        shell("dot -Tpdf %s > %s" % (name_dot, name_pdf))
+      push("\\includegraphics[%s]{%s}" % (args, name_pdf))
 
   def xcf(name, args=''):
     name_xcf = name+".xcf"
@@ -84,6 +91,13 @@
     name_eps = name+".eps"
     if not recall(name_eps, name_png):
       shell("convert %s %s" % (name_png, name_eps))
+    push("\\includegraphics[%s]{%s}" % (args, name_eps))
+
+  def gif(name, args=''):
+    name_gif = name+".gif"
+    name_eps = name+".eps"
+    if not recall(name_eps, name_gif):
+      shell("convert %s %s" % (name_gif, name_eps))
     push("\\includegraphics[%s]{%s}" % (args, name_eps))
 
   def xfig(fname_fig, args='', method='pdf'):
@@ -117,8 +131,18 @@
       fname_tex = re.sub("\.fig", ".tex", fname_fig)
       if not recall(fname_pdf, fname_fig, *deps) or not recall(fname_tex, fname_fig, *deps):
         shell("fig2dev -L pdftex -O %s > %s" % (fname_fig, fname_pdf))
-        shell("fig2dev -L pdftex_t -O -p %s %s > %s" % (fname_pdf, fname_fig, fname_tex))
-      push("\input{%s}" % (fname_tex, ))
+        shell("fig2dev -L pdftex_t -p %s %s > %s" % (fname_pdf, fname_fig, fname_tex))
+      push(r"\input{%s}" % (fname_tex, ))
+    elif method == 'pstex':
+      # Convert to the two part eps/latex form.
+      if args != '':
+        raise Exception(r"Don't know what to do with args in xfig() with method pstex.  Maybe wrap in a \resizebox instead?")
+      fname_ps = re.sub("\.fig", ".ps", fname_fig)
+      fname_tex = re.sub("\.fig", ".tex", fname_fig)
+      if not recall(fname_ps, fname_fig, *deps) or not recall(fname_tex, fname_fig, *deps):
+        shell("fig2dev -L pstex -O %s > %s" % (fname_fig, fname_ps))
+        shell("fig2dev -L pstex_t -p %s %s > %s" % (fname_ps, fname_fig, fname_tex))
+      push(r"\input{%s}" % (fname_tex, ))
     elif method == 'tikz':
       # Convert to a jangle of tikz code.
       # (This gave some strange compile errors...)
