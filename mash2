@@ -69,14 +69,15 @@ class Frame:
     # the interpreter.
     self.commands = unindent(self.commands)
 
-    # Actually execute the commands.
+    # Actually execute the commands.  (The extra blank lines before
+    # self.commands help to ensure that any stack traces make some sense.)
     mash.vars['_'] = self
     if "before_frame_hook" in mash.vars:
       code = compile("before_frame_hook()", self.file_name, 'exec')
       exec(code, mash.vars, mash.vars)
 
     try:
-      code = compile(self.commands, self.file_name, 'exec')
+      code = compile(('\n'*(self.start_line-1)) + self.commands, self.file_name, 'exec')
       exec(code, mash.vars, mash.vars)
     except SyntaxError as err:
       err.lineno += self.start_line - 1

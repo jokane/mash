@@ -1,0 +1,23 @@
+#!/usr/bin/env mash
+
+Generate an exception, to check whether the reported file and line number are
+correct.
+
+
+
+
+
+
+
+[[[
+  def function_with_exception():
+    a
+]]]
+
+
+
+
+
+[[[ 
+  function_with_exception()
+]]]
