@@ -35,12 +35,13 @@ import time
 import textwrap
 
 class Frame:
-  def __init__(self, _parent, file_name):
+  def __init__(self, _parent, file_name, start_line):
     # Remember our parent frame, or None if we're the root.
     self.parent = _parent
 
-    # Remember what file we come from.
+    # Remember where we come from.
     self.file_name = file_name
+    self.start_line = start_line
 
     # The full contents of this frame, including commands and text, which will
     # be filled in as we go.
@@ -73,8 +74,14 @@ class Frame:
     if "before_frame_hook" in mash.vars:
       code = compile("before_frame_hook()", self.file_name, 'exec')
       exec(code, mash.vars, mash.vars)
-    code = compile(self.commands, self.file_name, 'exec')
-    exec(code, mash.vars, mash.vars)
+
+    try:
+      code = compile(self.commands, self.file_name, 'exec')
+      exec(code, mash.vars, mash.vars)
+    except SyntaxError as err:
+      err.lineno += self.start_line - 1
+      raise err
+    
     if "after_frame_hook" in mash.vars:
       code = compile("after_frame_hook()", self.file_name, 'exec')
       exec(code, mash.vars, mash.vars)
@@ -98,11 +105,13 @@ class Mash:
     # one has no parent.
     current_frame = top_frame
 
+    
     # Walk through the text, looking for child frames, consuming
     # the text from the local variable 'text' as we go.
+    current_line = 1
     while text:
       # Do we have an include command next?
-      match = re.search(r'^\[\[\[\s*include (.*?)\s*\]\]\]', text)
+      match = re.search(r'^\[\[\[[ \t]*include (.*?)[ \t]*\]\]\]', text)
       if match:
         fname = match.group(1)
         ok = False
@@ -110,7 +119,7 @@ class Mash:
           x = os.path.join(directory, fname)
           if os.path.exists(x):
             print(x)
-            frame = Frame(current_frame, x)
+            frame = Frame(current_frame, x, 1)
             self.mash_string(open(x, 'r').read(), frame)
             current_frame.contents += frame.contents
             ok = True
@@ -128,7 +137,7 @@ class Mash:
         # child of the current one.  We'll add the text in future
         # iterations of this loop, and execute it when we see the
         # closing delimiter.
-        current_frame = Frame(current_frame, current_frame.file_name)
+        current_frame = Frame(current_frame, current_frame.file_name, current_line)
         text = text[3:]
         continue
       
@@ -146,6 +155,7 @@ class Mash:
       # we can.  At least one character, until we see [ or ] again.
       match = re.search(r"^(.[^\[\]]*)", text, re.DOTALL)
       current_frame.contents += match.group(0)
+      current_line += match.group(0).count('\n')
       eaten = match.group(1)
       text = text[len(eaten):]
     
@@ -186,11 +196,20 @@ class Mash:
     text = open(input_filename, 'r').read()
       
     try:
-      self.mash_string(text, Frame(None, input_filename))
+      self.mash_string(text, Frame(None, input_filename, 1))
     except subprocess.CalledProcessError as e:
       print(e)
-      print(e.stdout.decode("utf-8"))
-      print(e.stderr.decode("utf-8"))
+      try:
+        e.stdout = e.stdout.decode("utf-8")
+      except:
+        pass
+      try:
+        e.stderr = e.stderr.decode("utf-8")
+      except:
+        pass
+
+      print(e.stdout)
+      print(e.stderr)
 
     end_time = time.time()
     print("%d frames; %0.1f seconds" % (self.frame_count, end_time - start_time))

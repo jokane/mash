@@ -1,0 +1,22 @@
+#!/usr/bin/env mash
+
+Generate a syntax error, to check whether the reported file and line number
+are correct.
+
+
+
+
+
+
+
+
+
+
+
+
+[[[ b++ |||
+  [[[
+    def function_with_syntax_error():
+      a++
+  ]]]
+]]]
