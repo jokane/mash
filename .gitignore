@@ -1,5 +1,5 @@
 *.sw?
 *.pdf
 .mash
-.mash-prev
+.mash-archive
 __pycache__

@@ -1,0 +1,41 @@
+#!/usr/bin/env mash
+
+Some tests for inserting images in various formats.
+
+[[[ include mashlib.mash ]]]
+[[[ include latex.mash ]]]
+
+[[[
+  def ducks():
+    for fmt in ['png', 'pdf', 'eps', 'gif']:
+      imprt('figs/duck.' + fmt)
+      image('duck.' + fmt, args='width=1in')
+]]]
+
+[[[ latex_mode = 'latex' ]]]
+[[[ latex('image-latex') |||
+  \documentclass{article}
+  \usepackage{graphicx}
+  \begin{document}
+    [[[ ducks() ]]]
+  \end{document}
+]]]
+
+[[[ latex_mode = 'pdflatex' ]]]
+[[[ latex('image-pdflatex') |||
+  \documentclass{article}
+  \usepackage{graphicx}
+  \begin{document}
+    [[[ ducks() ]]]
+  \end{document}
+]]]
+
+[[[ latex_mode = 'xelatex' ]]]
+[[[ latex('image-xelatex') |||
+  \documentclass{article}
+  \usepackage{graphicx}
+  \begin{document}
+    [[[ ducks() ]]]
+  \end{document}
+]]]
+

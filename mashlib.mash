@@ -64,6 +64,11 @@ if not mashlib_initialized:
     os.makedirs(build_directory)
   os.chdir(build_directory)
 
+def ext(filename, ext):
+  """Return a modified version of the given filename with the given extension."""
+  (x,y) = os.path.splitext(filename)
+  return x + "." + ext
+
 def save(target, contents=None):
   """Ensure that the current contents of this frame exist in the build
   directory as a file with the given name.  Use an old copy from the archive
@@ -73,10 +78,6 @@ def save(target, contents=None):
   # Use the current frame text by default.
   if contents is None:
     contents = _.text
-
-  # Does this file already exist?  If so, something is probably wrong.
-  if(os.path.isfile(target)):
-    raise Exception("File %s already exists." % target)
 
   # Are we dealing with binary data or text?
   binary = hasattr(contents, 'decode')

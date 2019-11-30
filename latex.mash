@@ -1,8 +1,18 @@
 [[[ include mashlib.mash ]]]
 
 [[[
+  latex_mode = 'pdflatex'
+    # Which LaTeX compiler should we use?  Choices are:
+    # -- pdflatex
+    # -- latex
+    # -- xelatex
+    # This affects both the specific compiler used and the graphics formats.
 
-  def latex(name, compiler='pdflatex', ignore_deps=list(), keep_pdf=True, callback=None, max_compiles=None):
+  def latex(name, compiler=None, ignore_deps=list(), keep_pdf=True, callback=None, max_compiles=None):
+    # Complain in old documents.
+    if compiler is not None:
+      raise Exception('Compiler argument to latex() is no longer supported.  Set latex_mode variable instead.')
+
     # Write the document.
     save(name + ".tex") 
 
@@ -25,9 +35,8 @@
 
     deps = [item for item in deps if item not in ignore_deps]
 
-    # Check to see if we really need to build.
     if not recall(name+".pdf", *deps):
-      # Yes.  Run the compiler over and over until the log stops changing.
+      # Run the compiler over and over until the log stops changing.
       last_log = ''
       bibtex_done = False
       makeindex_done = False
@@ -35,7 +44,7 @@
       compiles = 0
       while True:
         try:
-          shell(compiler + " -interaction=batchmode -file-line-error -halt-on-error %s" % name)
+          shell(latex_mode + " -interaction=batchmode -file-line-error -halt-on-error %s" % name)
           compiles+=1
         except subprocess.CalledProcessError as e:
           e.stderr = open(name + '.log', 'r').read()
@@ -56,56 +65,38 @@
         if log == last_log: break
         last_log = log
 
-      if compiler == 'latex':
+      if latex_mode == 'latex':
         shell('dvipdf %s.dvi' % name)
 
     if keep_pdf:
       keep(name+".pdf")
 
-  def dot(name=None, via_fig=False, args='', method='pdftex'):
+  def dot(name=None, via_xfig=False, xfig_direct=True, args=''):
+    # If we don't have a name, make one up.
     if not name:
       name = anon()
-    name_dot = name+".dot"
-    name_fig = name+".fig"
-    name_pdf = name+".pdf"
-    name_eps = name+".eps"
+
+    # Figure out which format we should convert to.
+    if latex_mode == 'latex':
+      fmt = 'eps'
+    else:
+      fmt = 'pdf'
+
+    name_dot = ext(name, 'dot')
+    name_fig = ext(name, 'fig')
+    name_fmt = ext(name, fmt)
+    name_eps = ext(name, 'eps')
     save(name_dot)
-    if via_fig:
+    if via_xfig:
       if not recall(name_fig, name_dot):
         shell("dot -Tfig %s > %s" % (name_dot, name_fig))
-      xfig(name_fig, args, method=method)
+      xfig(name_fig, args, direct=xfig_direct)
     else:
-      if method=='eps':
-        if not recall(name_eps, name_dot):
-          shell("dot -Teps %s > %s" % (name_dot, name_pdf))
-        push("\\includegraphics[%s]{%s}" % (args, name_pdf))
-      else:
-        if not recall(name_pdf, name_dot):
-          shell("dot -Tpdf %s > %s" % (name_dot, name_pdf))
-        push("\\includegraphics[%s]{%s}" % (args, name_pdf))
+      if not recall(name_fmt, name_dot):
+        shell("dot -T%s %s > %s" % (fmt, name_dot, name_fmt))
+      push("\\includegraphics[%s]{%s}" % (args, name_fmt))
 
-  def xcf(name, args=''):
-    name_xcf = name+".xcf"
-    name_eps = name+".eps"
-    if not recall(name_eps, name_xcf):
-      shell("convert %s %s" % (name_xcf, name_eps))
-    push("\\includegraphics[%s]{%s}" % (args, name_eps))
-
-  def png(name, args=''):
-    name_png = name+".png"
-    name_eps = name+".eps"
-    if not recall(name_eps, name_png):
-      shell("convert %s %s" % (name_png, name_eps))
-    push("\\includegraphics[%s]{%s}" % (args, name_eps))
-
-  def gif(name, args=''):
-    name_gif = name+".gif"
-    name_eps = name+".eps"
-    if not recall(name_eps, name_gif):
-      shell("convert %s %s" % (name_gif, name_eps))
-    push("\\includegraphics[%s]{%s}" % (args, name_eps))
-
-  def xfig(fname_fig, args='', method='pdf'):
+  def xfig(fname_fig, args='', direct=True):
     """
     Insert an xfig diagram.
     """
@@ -121,45 +112,50 @@
       pic = match.group(3)
       imprt(pic)
       deps.append(pic)
-  
-    if method == 'pdf':
-      # Convert directly to PDF.
-      fname_pdf = re.sub("\.fig", ".pdf", fname_fig)
-      if not recall(fname_pdf, fname_fig, *deps):
-        shell("fig2dev -L pdf -O %s %s" % (fname_fig, fname_pdf))
-      push("\includegraphics[%s]{%s}" % (args, fname_pdf))
-    elif method == 'pdftex':
-      # Convert to the two part pdf/latex form.
-      if args != '':
-        raise Exception(r"Don't know what to do with args in xfig() with method pdftex.  Maybe wrap in a \resizebox instead?")
-      fname_pdf = re.sub("\.fig", ".pdf", fname_fig)
-      fname_tex = re.sub("\.fig", ".tex", fname_fig)
-      if not recall(fname_pdf, fname_fig, *deps) or not recall(fname_tex, fname_fig, *deps):
-        shell("fig2dev -L pdftex -O %s > %s" % (fname_fig, fname_pdf))
-        shell("fig2dev -L pdftex_t -p %s %s > %s" % (fname_pdf, fname_fig, fname_tex))
-      push(r"\input{%s}" % (fname_tex, ))
-    elif method == 'pstex':
-      # Convert to the two part eps/latex form.
-      if args != '':
-        raise Exception(r"Don't know what to do with args in xfig() with method pstex.  Maybe wrap in a \resizebox instead?")
-      fname_ps = re.sub("\.fig", ".ps", fname_fig)
-      fname_tex = re.sub("\.fig", ".tex", fname_fig)
-      if not recall(fname_ps, fname_fig, *deps) or not recall(fname_tex, fname_fig, *deps):
-        shell("fig2dev -L pstex -O %s > %s" % (fname_fig, fname_ps))
-        shell("fig2dev -L pstex_t -p %s %s > %s" % (fname_ps, fname_fig, fname_tex))
-      push(r"\input{%s}" % (fname_tex, ))
-    elif method == 'tikz':
-      # Convert to a jangle of tikz code.
-      # (This gave some strange compile errors...)
-      if args != '':
-        raise Exception(r"Don't know what to do with args in xfig() with method pdftex.  Maybe wrap in a \resizebox instead?")
-      fname_tex = re.sub("\.fig", ".tex", fname_fig)
-      if not recall(fname_tex, fname_fig, *deps):
-        shell("fig2dev -L tikz %s %s" % (fname_fig, fname_tex))
-      push("\input{%s}" % (fname_tex, ))
-    else:
-      raise Exception("Unknown method for xfig(): " + method)
 
+    # Figure out which format we should convert to.
+    if latex_mode == 'latex':
+      fmt = 'eps'
+      shfmt = 'ps'
+    else:
+      fmt = 'pdf'
+      shfmt = 'pdf'
+    fname_fmt = ext(fname_fig, fmt)
+    fname_tex = ext(fname_fig, 'tex')
+  
+    if direct:
+      # Convert to the two part pdf/latex or ps/latex form.
+      if args != '':
+        raise Exception(r"Don't know what to do with args in xfig() with direct=True.  Maybe wrap in a \resizebox instead?")
+
+      if not recall(fname_fmt, fname_fig, *deps):
+        shell("fig2dev -L %stex -O %s > %s" % (shfmt, fname_fig, fname_fmt))
+      if not recall(fname_tex, fname_fig, *deps):
+        shell("fig2dev -L %stex_t -p %s %s > %s" % (shfmt, fname_fmt, fname_fig, fname_tex))
+      push(r"\input{%s}" % (fname_tex, ))
+    else:
+      # Convert directly to an external format that can be inserted with
+      # \includegraphics.  Does not typeset labels with LaTeX.
+      if not recall(fname_fmt, fname_fig, *deps):
+        shell("fig2dev -L %s %s %s" % (fmt, fname_fig, fname_fmt))
+      push("\includegraphics[%s]{%s}" % (args, fname_fmt))
+
+  def image(name_orig, args=''):
+    if latex_mode == 'latex':
+      supported_fmts = ['eps']
+      target_fmt = 'eps'
+    else:
+      supported_fmts = ['pdf', 'png', 'jpg']
+      target_fmt = 'pdf'
+
+    (base, fmt) = os.path.splitext(name_orig)
+
+    # If the image we have is not in a supported format, convert it.
+    name_tgt = ext(name_orig, target_fmt)
+    if fmt not in supported_fmts and not recall(name_tgt, name_orig):
+      shell("convert %s %s" % (name_orig, name_tgt))
     
+    # Insert the image into the document.
+    push("\\includegraphics[%s]{%s}" % (args, name_tgt))
 
 ]]]

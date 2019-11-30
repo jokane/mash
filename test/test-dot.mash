@@ -1,0 +1,70 @@
+#!/usr/bin/env mash
+
+Some tests for inserting graphs via graphviz.
+
+[[[ include mashlib.mash ]]]
+[[[ include latex.mash ]]]
+
+[[[
+  gnum = ord('A')
+  def simple_graph():
+    global gnum
+    push("graph { A [label=\"$%s$\"] }" % chr(gnum))
+    gnum -=- 1
+]]]
+
+
+[[[ latex_mode = 'latex' ]]]
+
+[[[ latex('dot-latex') |||
+  \documentclass{article}
+  \usepackage{graphicx}
+  \usepackage{color}
+  \begin{document}
+    LaTeX mode, not via fig:\\
+    \fbox{[[[ dot() ||| [[[ simple_graph() ]]] ]]]}
+
+    LaTeX mode, via fig, direct:\\
+    \fbox{[[[ dot(via_xfig=True) ||| [[[ simple_graph() ]]] ]]]}
+
+    LaTeX mode, via fig, indirect:\\
+    \fbox{[[[ dot(via_xfig=True, xfig_direct=False) ||| [[[ simple_graph() ]]] ]]]}
+  \end{document}
+]]]
+
+[[[ latex_mode = 'pdflatex' ]]]
+
+[[[ latex('dot-pdflatex') |||
+  \documentclass{article}
+  \usepackage{graphicx}
+  \usepackage{color}
+  \begin{document}
+    PDF mode, not via fig:\\
+    \fbox{[[[ dot() ||| [[[ simple_graph() ]]] ]]]}
+
+    PDF mode, via fig, direct:\\
+    \fbox{[[[ dot(via_xfig=True) ||| [[[ simple_graph() ]]] ]]]}
+
+    PDF mode, via fig, indirect:\\
+    \fbox{[[[ dot(via_xfig=True, xfig_direct=False) ||| [[[ simple_graph() ]]] ]]]}
+  \end{document}
+]]]
+
+[[[ latex_mode = 'xelatex' ]]]
+
+[[[ latex('dot-xelatex') |||
+  \documentclass{article}
+  \usepackage{graphicx}
+  \usepackage{color}
+  \begin{document}
+    XeLaTeX mode, not via fig:\\
+    \fbox{[[[ dot() ||| [[[ simple_graph() ]]] ]]]}
+
+    XeLaTeX mode, via fig, direct:\\
+    \fbox{[[[ dot(via_xfig=True) ||| [[[ simple_graph() ]]] ]]]}
+
+    XeLaTeX mode, via fig, indirect:\\
+    \fbox{[[[ dot(via_xfig=True, xfig_direct=False) ||| [[[ simple_graph() ]]] ]]]}
+  \end{document}
+]]]
+
