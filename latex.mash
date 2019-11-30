@@ -75,9 +75,14 @@
         shell("dot -Tfig %s > %s" % (name_dot, name_fig))
       xfig(name_fig, args, method=method)
     else:
-      if not recall(name_pdf, name_dot):
-        shell("dot -Tpdf %s > %s" % (name_dot, name_pdf))
-      push("\\includegraphics[%s]{%s}" % (args, name_pdf))
+      if method=='eps':
+        if not recall(name_eps, name_dot):
+          shell("dot -Teps %s > %s" % (name_dot, name_pdf))
+        push("\\includegraphics[%s]{%s}" % (args, name_pdf))
+      else:
+        if not recall(name_pdf, name_dot):
+          shell("dot -Tpdf %s > %s" % (name_dot, name_pdf))
+        push("\\includegraphics[%s]{%s}" % (args, name_pdf))
 
   def xcf(name, args=''):
     name_xcf = name+".xcf"
