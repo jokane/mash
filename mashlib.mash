@@ -173,6 +173,7 @@ def shell(command, stdin=None):
 
 
 def push(text=""):
+  """Insert text, either the given argument or the contents of the current frame, into the parent frame."""
   global _
   if text:
     _.parent.contents += str(text)
