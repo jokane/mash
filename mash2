@@ -68,7 +68,6 @@ class Frame:
     # the interpreter.
     self.commands = unindent(self.commands)
 
-
     # Actually execute the commands.
     mash.vars['_'] = self
     if "before_frame_hook" in mash.vars:
@@ -190,8 +189,8 @@ class Mash:
       self.mash_string(text, Frame(None, input_filename))
     except subprocess.CalledProcessError as e:
       print(e)
-      print(e.stdout)
-      print(e.stderr)
+      print(e.stdout.decode("utf-8"))
+      print(e.stderr.decode("utf-8"))
 
     end_time = time.time()
     print("%d frames; %0.1f seconds" % (self.frame_count, end_time - start_time))
