@@ -25,7 +25,8 @@
       r'\\lstinputlisting(\[.*?\])?{(?P<dep>[^}]*)}',
       r'\\input{(?P<dep>[^}]*)}',
       r'\\includepdf{(?P<dep>[^}]*)}',
-      r'% dep (?P<dep>[^\n]*)'
+      r'% dep (?P<dep>[^\n]*)',
+      r'\\bibliography{(?P<dep>[^\n]*)}'
     ]
 
     deps = [name + ".tex"]
