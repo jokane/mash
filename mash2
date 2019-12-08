@@ -75,8 +75,12 @@ class Frame:
     if "before_frame_hook" in mash.vars:
       code = compile("before_frame_hook()", self.file_name, 'exec')
       exec(code, mash.vars, mash.vars)
+    
+    try:
+      code = compile(('\n'*(self.start_line-1)) + self.commands, self.file_name, 'exec')
+    except Exception as e:
+      raise e
 
-    code = compile(('\n'*(self.start_line-1)) + self.commands, self.file_name, 'exec')
     exec(code, mash.vars, mash.vars)
     
     if "after_frame_hook" in mash.vars:
@@ -143,7 +147,7 @@ class Mash:
       if match:
         current_frame.execute(self)
         if current_frame.parent is None:
-          raise Exception("Found a closing delimiter (]]]) at the top level.")
+          raise Exception("%s:%d: Found a closing delimiter (]]]) at the top level." % (current_frame.file_name, current_line))
         current_frame = current_frame.parent
         text = text[3:]
         continue

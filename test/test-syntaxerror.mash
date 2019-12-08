@@ -4,13 +4,12 @@ Generate a syntax error, to check whether the reported file and line number
 are correct.
 
 
-
-
-
-
-
-
-
+[[[ |||
+  An irrelevant frame.
+  [[[ |||
+    Another irrelevant frame.
+  ]]]
+]]]
 
 
 
