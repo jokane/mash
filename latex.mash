@@ -73,6 +73,10 @@
       keep(name+".pdf")
 
   def dot(name=None, via_xfig=False, xfig_direct=True, args=''):
+    # If we don't have any text in the frame, complain.
+    if not _.text.strip():
+      raise Exception("Called dot() on an empty frame.  This is unlikely to end well.")
+
     # If we don't have a name, make one up.
     if not name:
       name = anon()

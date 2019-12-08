@@ -1,0 +1,24 @@
+#!/usr/bin/env mash
+
+This tests dot() with an empty input.  This case is interesting
+because the dot command does not generate any error in this case,
+but the resulting image is an empty file, which leads to a
+strange-looking error.  Thus, we want to catch the problem in dot(),
+instead of when the latex document is compiled.
+
+Correct behavior: Exception raised by dot(), instead of "reading
+image file failed" from pdflatex.
+
+[[[ include latex.mash ]]]
+
+[[[ latex_mode='pdflatex']]]
+ 
+[[[ latex('test-emptydot') |||
+  \documentclass[11p]{article}
+  \usepackage{graphicx}
+  \begin{document}
+    [[[ dot() |||
+
+    ]]]
+  \end{document}
+]]]
