@@ -1,11 +1,5 @@
 #!/usr/bin/env mash
 
-Generate an exception, to check whether the reported file and line number are
-correct.
-
-
-
-
 [[[ |||
   An irrelevant frame.
   [[[ |||
@@ -13,18 +7,8 @@ correct.
   ]]]
 ]]]
 
+This is not Python code.  But it should not be executed; instead we should
+get a complaint about the extra closing delimiter below.  
 
-
-[[[
-  def function_with_exception():
-    a
-]]]
-
-
-
-
-
-[[[ 
-  function_with_exception()
 ]]]
 
