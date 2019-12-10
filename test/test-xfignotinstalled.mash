@@ -1,0 +1,3 @@
+#!/usr/bin/env
+
+Correct behavior: Exception raised by xfig(), rather than a mysterios error from pdflatex.

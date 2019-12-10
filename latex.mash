@@ -101,13 +101,14 @@
         shell("dot -T%s %s > %s" % (fmt, name_dot, name_fmt))
       push("\\includegraphics[%s]{%s}" % (args, name_fmt))
 
-  def xfig(fname_fig, args='', direct=True):
+  def xfig(fname_fig, args='', direct=True, include_depths=None, exclude_depths=None):
     """
     Insert an xfig diagram.
     """
 
-    # TODO: A few useful things like layers are implemented in the
-    # jokane-talk.mash version of this function.
+    # Sanity check.
+    if include_depths and exclude_depths:
+      raise Exception("Got both include_depths and exclude_depths.  Can't do both.")
 
     fig_source = open(fname_fig, 'r').read()
 
@@ -125,24 +126,60 @@
     else:
       fmt = 'pdf'
       shfmt = 'pdf'
-    fname_fmt = ext(fname_fig, fmt)
-    fname_tex = ext(fname_fig, 'tex')
+
+    # Get the main root filename.
+    fname = ext(fname_fig, '')[:-1]
+    print(fname)
+
+    # Sort out the include/exclude business.
+    fig2dev_args = ""
+    if include_depths or exclude_depths:
+      # Which list are we working with?
+      if include_depths:
+        flag = '+'
+        depths = include_depths
+      if exclude_depths:
+        flag = '-'
+        depths = exclude_depths
+
+      # Make sure we actually have a list.
+      try:
+        iter(depths)
+      except TypeError: 
+        depths = (depths, )
+
+      # Put the list into the format fig2dev expects.
+      depths = flag + ",".join(map(lambda x: str(x), depths))
+
+      # Append this string to the file name, so we can build distinct
+      # versions of the same fig from different depths.
+      fname += "-depths" + depths
+
+      # Make sure fig2dev gets the message about which depths we want.
+      fig2dev_args += "-K -D" + depths
+
+    fname_fmt = ext(fname, fmt)
+    fname_tex = ext(fname, 'tex')
+
+    print(fname_fmt)
+    print(fname_tex)
   
     if direct:
-      # Convert to the two part pdf/latex or ps/latex form.
+      # Convert to the two part pdf/latex or ps/latex form.  Typesets using
+      # LaTeX, but cannot accept includegraphics arguments.
       if args != '':
         raise Exception(r"Don't know what to do with args in xfig() with direct=True.  Maybe wrap in a \resizebox instead?")
 
       if not recall(fname_fmt, fname_fig, *deps):
-        shell("fig2dev -L %stex -O %s > %s" % (shfmt, fname_fig, fname_fmt))
+        shell("fig2dev -L %stex %s -O %s > %s" % (shfmt, fig2dev_args, fname_fig, fname_fmt))
       if not recall(fname_tex, fname_fig, *deps):
-        shell("fig2dev -L %stex_t -p %s %s > %s" % (shfmt, fname_fmt, fname_fig, fname_tex))
+        shell("fig2dev -L %stex_t %s -p %s %s > %s" % (shfmt, fig2dev_args, fname_fmt, fname_fig, fname_tex))
       push(r"\input{%s}" % (fname_tex, ))
     else:
       # Convert directly to an external format that can be inserted with
       # \includegraphics.  Does not typeset labels with LaTeX.
       if not recall(fname_fmt, fname_fig, *deps):
-        shell("fig2dev -L %s %s %s" % (fmt, fname_fig, fname_fmt))
+        shell("fig2dev -L %s %s %s %s" % (fmt, fig2dev_args, fname_fig, fname_fmt))
       push("\includegraphics[%s]{%s}" % (args, fname_fmt))
 
   def image(name_orig, args=''):
