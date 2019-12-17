@@ -129,7 +129,6 @@
 
     # Get the main root filename.
     fname = ext(fname_fig, '')[:-1]
-    print(fname)
 
     # Sort out the include/exclude business.
     fig2dev_args = ""
@@ -161,9 +160,6 @@
     fname_fmt = ext(fname, fmt)
     fname_tex = ext(fname, 'tex')
 
-    print(fname_fmt)
-    print(fname_tex)
-  
     if direct:
       # Convert to the two part pdf/latex or ps/latex form.  Typesets using
       # LaTeX, but cannot accept includegraphics arguments.
