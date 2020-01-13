@@ -90,7 +90,6 @@
     name_dot = ext(name, 'dot')
     name_fig = ext(name, 'fig')
     name_fmt = ext(name, fmt)
-    name_eps = ext(name, 'eps')
     save(name_dot)
     if via_xfig:
       if not recall(name_fig, name_dot):
