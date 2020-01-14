@@ -43,6 +43,10 @@ if not mashlib_initialized:
   # This is a list of places we should search when importing a new file.
   import_search_directories = [original_directory, ]
 
+  # This is a list of executable names whose existence we have already
+  # verified.
+  executables_checked = dict()
+
   # Move anything from the existing build directory to be the archive directory.
   if os.path.exists(build_directory):
     for file_name in os.listdir(build_directory):
@@ -155,7 +159,7 @@ def anon():
   global _
   return hashlib.sha1(_.text.encode('UTF-8')).hexdigest()[:7]
 
-def shell(command, stdin=None):
+def shell(command, stdin=None, check=True):
   """
   Execute the given command in a shell.  Raise subprocess.CalledProcessError
   if the command gives a non-zero return code.  Return the CompletedProcess
@@ -163,6 +167,9 @@ def shell(command, stdin=None):
   has attributes tacked on to it showing the user time and system time
   consumed, as reported by getrusage.
   """
+
+  if check:
+    check_for_executable(command.split(' ')[0])
   print("  ", command)
   usage_before = resource.getrusage(resource.RUSAGE_CHILDREN)
   completed_process = subprocess.run(command, shell=True, check=True, input=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60000)
@@ -260,7 +267,17 @@ def spell_check():
   """
   for file_name in glob.glob(os.path.join(original_directory, '*.mash')):
     os.system("aspell check --home-dir=" + original_directory + " --keymapping ispell " + file_name)
-    
+
+
+def check_for_executable(exe):
+  """
+  Check whether some executable with the given name exists in the path.  If it
+  does not exist, complain.
+  """
+  if exe not in executables_checked and shutil.which(exe) is None:
+    raise Exception(f'Executable {exe} not found in path.')
+  executables_checked[exe] = True
+
 
 ]]]
 
