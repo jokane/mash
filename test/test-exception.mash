@@ -3,7 +3,8 @@
 Generate an exception, to check whether the reported file and line number are
 correct.
 
-
+Correct behavior: NameError, with traceback complaining about lines 21 and
+29.
 
 
 [[[ |||

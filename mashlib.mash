@@ -183,6 +183,8 @@ def push(text=""):
 def keep(file_to_keep):
   """Copy a file or directory from the working directory to the keep
   directory."""
+  if not os.path.isabs(keep_directory):
+    raise Exception(f'Keep directory ({keep_directory}) is a relative path, which would be interpreted relative to the build directory ({build_directory}).  This almost certainly not what you want.  Use an absolute path for keep_directory instead.')
   if not os.path.exists(keep_directory):
     os.makedirs(keep_directory)
   if os.path.isfile(file_to_keep):

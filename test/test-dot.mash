@@ -2,6 +2,8 @@
 
 Some tests for inserting graphs via graphviz.
 
+Correct behavior: Run successfully; produce three similar documents called dot-latex.pdf, dot-pdflatex.pdf, and dot-xelatex.pdf.
+
 [[[ include mashlib.mash ]]]
 [[[ include latex.mash ]]]
 

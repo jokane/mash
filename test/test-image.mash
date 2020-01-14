@@ -2,6 +2,8 @@
 
 Some tests for inserting images in various formats.
 
+Correct behavior: Run successfully; produce three similar documents called image-latex.pdf, image-pdflatex.pdf, and image-xelatex.pdf.
+
 [[[ include mashlib.mash ]]]
 [[[ include latex.mash ]]]
 

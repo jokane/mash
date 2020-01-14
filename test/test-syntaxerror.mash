@@ -3,6 +3,7 @@
 Generate a syntax error, to check whether the reported file and line number
 are correct.
 
+Correct behavior: Complaint about syntax error on line 20.
 
 [[[ |||
   An irrelevant frame.

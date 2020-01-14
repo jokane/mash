@@ -145,9 +145,9 @@ class Mash:
       # Do we have a closing delimiter next?
       match = re.search(r"^\]\]\]", text)
       if match:
-        current_frame.execute(self)
         if current_frame.parent is None:
           raise Exception("%s:%d: Found a closing delimiter (]]]) at the top level." % (current_frame.file_name, current_line))
+        current_frame.execute(self)
         current_frame = current_frame.parent
         text = text[3:]
         continue
