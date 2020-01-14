@@ -160,6 +160,10 @@ class Mash:
       eaten = match.group(1)
       text = text[len(eaten):]
     
+    # Done walking through the whole string.  Did the string close every
+    # frame that it opened?  If not, something is wrong. 
+    if current_frame != top_frame:
+      raise Exception('At least one unclosed frame.')
 
   def fix_path(self, path):
     """ Make sure the given path is absolute, and that it exists."""

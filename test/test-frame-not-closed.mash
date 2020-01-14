@@ -1,0 +1,14 @@
+#!/usr/bin/env mash
+
+We should get a complaint when the document ends with unclosed frames.
+
+
+[[[ include mashlib.mash ]]]
+[[[ include latex.mash ]]]
+
+[[[ latex('test', keep_pdf=False) |||
+  \documentclass{article}
+  \begin{document}
+    foo bar
+  \end{document}
+
