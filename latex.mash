@@ -177,6 +177,45 @@
         shell("fig2dev -L %s %s %s %s" % (fmt, fig2dev_args, fname_fig, fname_fmt))
       push("\includegraphics[%s]{%s}" % (args, fname_fmt))
 
+  def asy(name=None, args=''):
+    # If we don't have any text to compile, complain.
+    if not _.text.strip() and not name:
+      raise Exception("Called asy() on an empty frame and not file to read.  This is unlikely to end well.")
+
+    # If we don't have any text to compile, complain.
+    if _.text.strip() and name:
+      raise Exception("Called asy() with both a file name and inline text.  Which one should I compile?")
+
+
+    # Figure out which format we should convert to.
+    if latex_mode == 'latex':
+      fmt = 'eps'
+    else:
+      fmt = 'pdf'
+
+    # Form the filenames.
+    name_asy = ext(name, 'asy')
+    name_fmt = ext(name, fmt)
+
+    # Make sure we have a name and a file.
+    if not name:
+      name = anon()
+      save(name_asy)
+
+    # Check for any  dependencies (i.e. import ....)
+    deps = list()
+    for match in re.finditer(r'^\s*import\s+([a-zA-Z._-]*)\s*;', _.text, re.DOTALL):
+      dep_mod = ext(match.group(1), 'asy')
+      deps.append(dep_mod)
+
+    # If any of these files exist in any import directories, import them.  If
+    # not, no big deal.
+    imprt(*deps, conditional=True)
+
+    if not recall(name_fmt, name_asy, *deps):
+      shell("asy %s -tex %s -f %s -o %s" % (name_asy, latex_mode, fmt, name_fmt))
+    push("\\includegraphics[%s]{%s}" % (args, name_fmt))
+
   def image(name_orig, args=''):
     if latex_mode == 'latex':
       supported_fmts = ['eps']
