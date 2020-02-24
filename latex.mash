@@ -18,23 +18,30 @@
 
     # Build a list of dependencies.
     
-    # Regular expressions whose matches give us dependencies.  Each one should
-    # have a group named 'dep' that gives the name of the depended-upon file.
+    # Patterns to find dependencies.  Each one should be a tuple, with:
+    # - A regex with a group named 'dep' that gives the stuff to match, and
+    # - A function to return a list of things to depend on, or None, if the
+    # 'dep' group matches the name directly.
     dep_patterns = [
-      r'\\includegraphics(\[.*?\])?{(?P<dep>[^}]*)}',
-      r'\\lstinputlisting(\[.*?\])?{(?P<dep>[^}]*)}',
-      r'\\input{(?P<dep>[^}]*)}',
-      r'\\includepdf{(?P<dep>[^}]*)}',
-      r'% dep (?P<dep>[^\n]*)',
-      r'\\bibliography{(?P<dep>[^\n]*)}'
+      (r'\\includegraphics(\[.*?\])?{(?P<dep>[^}]*)}', None),
+      (r'\\lstinputlisting(\[.*?\])?{(?P<dep>[^}]*)}', None),
+      (r'\\input{(?P<dep>[^}]*)}', None),
+      (r'\\includepdf{(?P<dep>[^}]*)}', None),
+      (r'% dep (?P<dep>[^\n]*)', None),
+      (r'\\bibliography{(?P<dep>[^\n]*)}', lambda x: x.split(','))
     ]
 
     deps = [name + ".tex"]
-    for pattern in dep_patterns:
+    for pattern,func in dep_patterns:
       for match in re.finditer(pattern, _.text, re.DOTALL):
-        deps.append(match.group('dep'))
-
+        if func:
+          deps = deps + func(match.group('dep'))
+        else:
+          deps.append(match.group('dep'))
+          
     deps = [item for item in deps if item not in ignore_deps]
+
+    print("deps:", deps)
 
     if not recall(name+".pdf", *deps):
       # Run the compiler over and over until the log stops changing.
