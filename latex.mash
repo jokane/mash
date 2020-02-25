@@ -41,8 +41,6 @@
           
     deps = [item for item in deps if item not in ignore_deps]
 
-    print("deps:", deps)
-
     if not recall(name+".pdf", *deps):
       # Run the compiler over and over until the log stops changing.
       last_log = ''
