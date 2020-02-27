@@ -273,9 +273,16 @@ def spell_check():
   """
   Run aspell on every file with a .mash extension in the original directory.
   """
+  restart = False
   for file_name in glob.glob(os.path.join(original_directory, '*.mash')):
+    contents_before = open(file_name, 'r').read()
     os.system("aspell check --home-dir=" + original_directory + " --keymapping ispell " + file_name)
+    contents_after = open(file_name, 'r').read()
+    if(contents_before != contents_after):
+      restart = True
 
+  if restart:
+    raise RestartRequest
 
 def check_for_executable(exe):
   """

@@ -34,6 +34,9 @@ import subprocess
 import time
 import textwrap
 
+class RestartRequest (Exception):
+  pass
+
 class Frame:
   def __init__(self, _parent, file_name, start_line):
     # Remember our parent frame, or None if we're the root.
@@ -175,7 +178,7 @@ class Mash:
     return path
     
   def engage(self):
-    """ This is the 'main' function."""
+    """ Actually do things, based on what the command line asked for. """
     start_time = time.time()
 
     if '-c' in sys.argv:
@@ -196,7 +199,10 @@ class Mash:
 
     self.frame_count = 1
 
-    self.vars = dict()
+    self.vars = {
+      '_': None,
+      'RestartRequest': RestartRequest
+    }
 
     text = open(input_filename, 'r').read()
       
@@ -219,7 +225,19 @@ class Mash:
     end_time = time.time()
     print("%d frames; %0.1f seconds" % (self.frame_count, end_time - start_time))
 
+  def main(self):
+    """ Main entry point, including logic to respond to restart requests. """
+    done = False
+    original_cwd = os.getcwd()
+    while not done:
+      os.chdir(original_cwd)
+      try:
+        self.engage()
+        done = True
+      except RestartRequest:
+        pass
+
 if __name__ == '__main__':
-  Mash().engage()
+  Mash().main()
 
   
