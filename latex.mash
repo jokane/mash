@@ -226,7 +226,7 @@
       supported_fmts = ['eps']
       target_fmt = 'eps'
     else:
-      supported_fmts = ['pdf', 'png', 'jpg']
+      supported_fmts = ['pdf', 'png', 'jpg', 'jpeg']
       target_fmt = 'pdf'
 
     (base, fmt) = os.path.splitext(name_orig)
