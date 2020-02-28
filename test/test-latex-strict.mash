@@ -1,0 +1,56 @@
+#!/usr/bin/env mash
+
+Ensure that the strict=True option for latex() correctly finds problems.
+
+Correct behavior: Exceptions for the first two, no exception for the last
+one.
+
+[[[ include mashlib.mash ]]]
+[[[ include latex.mash ]]]
+[[[ latex_mode = 'pdflatex']]] 
+
+[[[
+  results = ""
+
+  def test_case(title):
+    global results
+    try:
+      latex(title, keep_pdf=False, strict=True)
+      results += ('***** %s: ok' % title) + '\n'
+    except Exception as e:
+      results += ('**** %s: failed with exception %s' % (title, e)) + '\n'
+]]]
+
+
+[[[ test_case('bad_ref') |||
+\documentclass{article}
+\begin{document}
+  \ref{bad_ref}
+  \ref{another_bad_ref}
+\end{document}
+]]]
+
+
+[[[ test_case('bad_cite') |||
+\documentclass{article}
+\begin{document}
+  \cite{bad_cite}
+  \cite{another_bad_cite}
+  [[[ save('test.bib') ]]]
+  \bibliographystyle{plain}
+  \bibliography{test}
+\end{document}
+]]]
+
+[[[ test_case('ok') |||
+\documentclass{article}
+\begin{document}
+  Hello
+\end{document}
+]]]
+
+[[[
+  print(results)
+]]]
+
+

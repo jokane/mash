@@ -8,7 +8,7 @@
     # -- xelatex
     # This affects both the specific compiler used and the graphics formats.
 
-  def latex(name, compiler=None, ignore_deps=list(), keep_pdf=True, callback=None, max_compiles=None):
+  def latex(name, compiler=None, ignore_deps=list(), keep_pdf=True, callback=None, max_compiles=None, strict=False):
     # Complain in old documents.
     if compiler is not None:
       raise Exception('Compiler argument to latex() is no longer supported.  Set latex_mode variable instead.')
@@ -74,8 +74,39 @@
       if latex_mode == 'latex':
         shell('dvipdf %s.dvi' % name)
 
+      # If we are doing strict checking, dig through the final log, looking
+      # for problem.
+      if strict:
+        complaints = check_latex_log(log)
+        if complaints:
+          # Found something wrong.  Remove the output to ensure that the next
+          # build will try to compile again.  Then complain.
+          os.remove(name+".pdf") 
+          raise Exception(complaints)
+
     if keep_pdf:
       keep(name+".pdf")
+
+  def check_latex_log(log):
+    """ Given the contents of a LaTeX log file, check it for important warnings.  Return a string describing the complaints, or None if there's nothing to complain about. """
+
+    print(log)
+    problem_patterns = [
+      r"LaTeX Warning: Reference `.*' on page \d+ undefined on input line \d+.",
+      r"LaTeX Warning: Citation `.*' on page \d+ undefined on input line \d+."
+    ]
+
+    complaints = list()
+
+    for pattern in problem_patterns:
+      for match in re.finditer(pattern, log):
+        complaints.append(match.group(0))
+
+    if complaints:
+      return '\n'.join(complaints)
+    else:
+      return None
+
 
   def dot(name=None, via_xfig=False, xfig_direct=True, args=''):
     # If we don't have any text in the frame, complain.
