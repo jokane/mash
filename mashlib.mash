@@ -207,8 +207,14 @@ def keep(file_to_keep):
     print(file_to_keep)
     raise Exception("Don't know how to keep %s, which is neither file nor directory." % file_to_keep)
   
-def imprt(*fnames, conditional=False):
-  """Copy one or more files to the build directory.  If conditional=True, don't complain if the files don't exist."""
+def imprt(*fnames, target=None, conditional=False):
+  """Copy one or more files to the build directory.  If target is given, there should be only one file name given, and the file will be renamed as it is imported.  If conditional=True, don't complain if the files don't exist."""
+
+  # Sanity check.
+  if target and len(fnames) > 1:
+    raise Exception("Called imprt() with both multiple inputs and a target.")
+    
+  # Import each thing, one at a time.
   for fname in fnames:
     # Figure out the source filename.
     fr = None
@@ -224,7 +230,9 @@ def imprt(*fnames, conditional=False):
         raise Exception("Trying to import %s, but could not find it in any of these places:\n %s" % (fname, '\n'.join(import_search_directories)))
 
     # Figure out the destination filename.
-    to = os.path.join(build_directory, os.path.basename(fname))
+    if not target:
+      target = fname
+    to = os.path.join(build_directory, os.path.basename(target))
 
     # Does this file exist already?
     if os.path.isfile(to) and filecmp.cmp(fr, to, False):
