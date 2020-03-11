@@ -231,8 +231,10 @@ def imprt(*fnames, target=None, conditional=False):
 
     # Figure out the destination filename.
     if not target:
-      target = fname
-    to = os.path.join(build_directory, os.path.basename(target))
+      dest = os.path.basename(fname)
+    else:
+      dest = target
+    to = os.path.join(build_directory, dest)
 
     # Does this file exist already?
     if os.path.isfile(to) and filecmp.cmp(fr, to, False):
@@ -241,6 +243,7 @@ def imprt(*fnames, target=None, conditional=False):
     else:
       print(fr)
       shutil.copy2(fr, to)
+
   try:
     return os.path.basename(fname)
   except UnboundLocalError:
