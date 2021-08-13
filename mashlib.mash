@@ -252,7 +252,7 @@ def imprt(*fnames, target=None, conditional=False):
   except UnboundLocalError:
     return None
 
-def filter(command):
+def shell_filter(command):
   """
   Execute the given command in a shell, giving the contents of this frame as
   standard input.  Replace the contents of this frame with the output.
@@ -261,7 +261,7 @@ def filter(command):
   _.text = result.stdout.decode('utf-8')
 
 def strip():
-  _.text = _.text.rstrip()
+  _.text = _.text.rstrip().lstrip()
 
 def unindent():
   match = re.search(r'([ \t]*)[^ \t\n]', _.text)
@@ -276,7 +276,7 @@ def before_frame_hook():
   # because this code might run on itself.
   def import_and_mangle(match):
     fr = match.group(1)
-    fr = os.path.join(original_directory,fr)
+    # fr = os.path.join(original_directory,fr)
     to = imprt(fr)
     return to
   regex = r'@'+r'@([A-Za-z0-9_./-]*)'
