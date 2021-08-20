@@ -158,8 +158,8 @@ def recall(target, *sources):
   return ok
 
 def anon(content=None):
-  """Return an anonymous name constructed by hashing the contents of the
-  current frame."""
+  """Return an anonymous name constructed by hashing the given content or, by
+  default, the contents of the current frame."""
   global _
   if content is None:
     content = _.text
