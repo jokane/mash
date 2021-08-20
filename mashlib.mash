@@ -130,6 +130,7 @@ def recall(target, *sources):
     print("%s:" % target, end='')
     target_time = os.path.getmtime(archive_target)
     if sources:
+      sources = list(dict.fromkeys(sources))
       for source in sources:
         try:
           source_time = os.path.getmtime(source)
