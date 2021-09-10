@@ -265,7 +265,6 @@
     # If the image we have is not in a supported format, convert it.
     name_tgt = ext(name_orig, target_fmt)
     if fmt not in supported_fmts and not recall(name_tgt, name_orig):
-      print(fmt, target_fmt)
       if fmt == '.svg' and target_fmt == 'pdf':
         shell("inkscape %s --export-pdf=%s" % (name_orig, name_tgt))
       else:
