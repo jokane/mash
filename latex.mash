@@ -28,7 +28,7 @@
       (r'\\input{(?P<dep>[^}]*)}', None),
       (r'\\includepdf{(?P<dep>[^}]*)}', None),
       (r'% dep (?P<dep>[^\n]*)', None),
-      (r'\\bibliography{(?P<dep>[^\n]*)}', lambda x: x.split(','))
+      (r'\\bibliography{(?P<dep>[^\n]*)}', lambda x: [y if y.endswith('.bib') else y + '.bib' for y in x.split(',')])
     ]
 
     deps = [name + ".tex"]

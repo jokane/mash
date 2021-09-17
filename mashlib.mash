@@ -265,10 +265,13 @@ def strip():
   _.text = _.text.rstrip().lstrip()
 
 def unindent():
-  match = re.search(r'([ \t]*)[^ \t\n]', _.text)
-  if match:
-    prefix = match.group(1)
-    _.text = re.sub('\n' + prefix, '\n', _.text)
+  if '\n' not in _.text:
+    _.text = _.text.strip()
+  else:
+    match = re.search(r'([ \t]*)[^ \t\n]', _.text)
+    if match:
+      prefix = match.group(1)
+      _.text = re.sub('\n' + prefix, '\n', _.text)
 
 
 def before_frame_hook():
