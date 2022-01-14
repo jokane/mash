@@ -1,7 +1,10 @@
 [[[ include mashlib.mash ]]]
 
 [[[
-  latex_mode = 'pdflatex'
+  try:
+      latex_mode
+  except NameError:
+      latex_mode = 'pdflatex'
     # Which LaTeX compiler should we use?  Choices are:
     # -- pdflatex
     # -- latex
