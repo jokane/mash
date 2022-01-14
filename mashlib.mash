@@ -283,7 +283,7 @@ def before_frame_hook():
     # fr = os.path.join(original_directory,fr)
     to = imprt(fr)
     return to
-  regex = r'@'+r'@([A-Za-z0-9_./-]*)'
+  regex = r'@'+r'@([A-Za-z0-9_./+-]*)'
   _.text = re.sub(regex, import_and_mangle, _.text)
   _.commands = re.sub(regex, import_and_mangle, _.commands)
 
