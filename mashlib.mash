@@ -104,7 +104,10 @@ def save(target, contents=None):
     # saving directly.  This keeps the timestamp intact, which can help us
     # tell elsewhere if things need to be rebuilt.
     #print("Using %s from archive." % target)
-    shutil.copy2(archive_name, target)
+    try:
+        shutil.copy2(archive_name, target)
+    except shutil.SameFileError:
+        pass
 
   else:
     # We don't have a file like this anywhere.  Actually save it.
