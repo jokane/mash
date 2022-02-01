@@ -117,7 +117,7 @@
           c = a + b
           a = b
           b = c
-          print c, "\\qquad",
+          print (c, "\\qquad")
       ]]]
     $$
 
@@ -133,13 +133,13 @@
     ]]]
 
     [[[python_output() |||
-      print "$$"
+      print ("$$")
       for i in range(1, int(1e6)):
         pass
 
       for i in range(1, 10):
-        print i*i, "\\qquad"
-      print "$$"
+        print (i*i, "\\qquad")
+      print ("$$")
     ]]]
 
 
