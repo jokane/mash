@@ -54,7 +54,8 @@
       compiles = 0
       while True:
         try:
-          shell(latex_mode + " -interaction=batchmode -file-line-error -halt-on-error %s" % name)
+          shell(latex_mode + " --shell-escape -interaction=batchmode -file-line-error -halt-on-error %s" % name)
+          # shell(latex_mode + " -interaction=batchmode -file-line-error -halt-on-error %s" % name)
           compiles+=1
         except subprocess.CalledProcessError as e:
           e.stderr = open(name + '.log', 'r').read()
@@ -66,6 +67,9 @@
           aux = open(name+'.aux', 'r').read()
           if re.search(r'\\citation', aux):
             shell("bibtex -terse %s" % name)
+            bibtex_done = True             
+          if re.search(r'cite', aux):
+            shell("biber %s" % name)
             bibtex_done = True
         if not makeindex_done and os.path.isfile(name+".idx"):
           shell("makeindex %s.idx" % name)
