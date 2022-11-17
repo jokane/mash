@@ -1,0 +1,175 @@
+#!/usr/bin/env python3
+
+# -- mash --
+#
+# This is a tool that allows text in various languages to be stored together
+# in a single input file. along with instructions for manipulating, mutating,
+# and storing that text.
+#
+# Q. Why?
+#
+# A1. Allows me to avoid naming things that appear only quickly in passing.
+# A2. Allows me to divide things into files based on content, rather than
+#     language.
+# A3. Can keep content and build instructions in the same place.
+#
+# History:
+#   2016-11-17: Started as a revision of some older, presentation-specific scripts.
+#   2016-12-12: First working version.
+#   2017-02-20: Various language additions, mostly for build commands.
+#   2017-04-20: More language expansions.  Better error handling.
+#   2017-07-11: Betting handling of semicolons in commands.
+#   2017-12-05: Better error messages.
+#   2018-04-06: @@ syntax for quick importing
+#   2018-07-26: Better handling of commas in commands.
+#   2018-08-17: & syntax for inserting chunks.
+#   2019-04-02: Starting major rewrite, replacing custom language with Python.
+#   2022-11-17: Starting second major overall, to allow parallel execution.
+
+import argparse
+import sys
+import re
+import os
+import shutil
+import subprocess
+import time
+import textwrap
+import heapq
+import enum
+import pprint
+
+class RestartRequest (Exception):
+  """ A special exception to be raised when some part of the code wants to start the entire process over. """
+  pass
+
+class Token(enum.Enum):
+    INCLUDE = 1
+    OPEN = 2
+    SEPARATOR = 3
+    CLOSE = 4
+    def __lt__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value < other.value
+        else:
+            return NotImplemented
+
+def string_to_tokens(text):
+    # Regex patterns of things we are looking for.
+    patterns = [
+        (Token.OPEN, r'\[\[\['),
+        (Token.SEPARATOR,  r'\|\|\|'),
+        (Token.CLOSE,  r'\]\]\]'),
+    ]
+
+    # Pointer to the current location in the text.
+    index = 0
+    
+    # Form a priority queue of tokens that we've found in the text.  Each one
+    # refers to the next instance of each type of token that appears.  Start
+    # with dummy instances of each token, which will actually be searched in
+    # the first iterations of the main loop below.
+    pq = []
+    for token_type, pattern in patterns:
+        regex = re.compile(pattern, re.DOTALL)
+        match = None
+        start = -int(token_type.value)
+        pq.append((start, token_type, regex, match))
+    heapq.heapify(pq)
+
+    # Keep emitting tokens until we run out of them.
+    while pq:
+        # Which token is next?
+        start, token_type, regex, match = heapq.heappop(pq)
+        # print(start, token_type, regex, match)
+
+        # Is there some boring text before this token?  If so, emit it first.
+        if start > index:
+            yield text[index:start]
+
+        # Emit this token and move forward in the text.  Except if we have a
+        # negative start value, which is a special case set by the
+        # initialization loop above, indicating that we've not yet even
+        # searched for this type of token.  (This special condition keeps us
+        # from needed to duplicate the code below that does the searching.)
+        if start > 0:
+            yield token_type
+            index = match.span()[1]
+
+        # Search for this pattern from the current location.  If we find the
+        # pattern, add the result to the queue.
+        match = regex.search(text, index)
+        if match:
+            start = match.span()[0] if match else float('inf')
+            heapq.heappush(pq, (start, token_type, regex, match))
+    
+    # If any text is left at the end, emit that too.
+    if index < len(text):
+        yield text[index:]
+
+
+class Frame:
+    def __init__(self, parent, text, index):
+        self.parent = parent
+
+
+
+def engage():
+  """ Actually do things, based on what the command line asked for. """
+
+  if '-c' in sys.argv:
+      if os.path.exists(".mash"):
+          shutil.rmtree(".mash")
+      if os.path.exists(".mash-archive"):
+          shutil.rmtree(".mash-archive")
+      sys.argv.remove('-c')
+      if len(sys.argv) == 1:
+          return
+
+  if len(sys.argv) == 1:
+      print('[reading from stdin]')
+      input_filename = '/dev/stdin'
+  else:
+      input_filename = sys.argv[1]
+  original_directory = os.getcwd()
+
+
+  text = open(input_filename, 'r').read()
+
+  tokens = string_to_tokens(text)
+  pprint.pprint(list(tokens))
+    
+  try:
+      root = Frame(None, text, 0)
+  except subprocess.CalledProcessError as e:
+      print(e)
+      try:
+          e.stdout = e.stdout.decode("utf-8")
+      except:
+          pass
+      try:
+          e.stderr = e.stderr.decode("utf-8")
+      except:
+          pass
+
+      print(e.stdout)
+      print(e.stderr)
+
+  print(root)
+
+def main():
+    """ Main entry point.  Mostly just logic to respond to restart requests. """
+    done = False
+    original_cwd = os.getcwd()
+    while not done:
+        os.chdir(original_cwd)
+        try:
+            engage()
+            done = True
+        except RestartRequest:
+            pass
+
+
+if __name__ == '__main__':
+  main()
+
+  
