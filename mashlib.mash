@@ -196,23 +196,37 @@ def push(text=""):
   else:
     _.parent.contents += _.text
 
-def keep(file_to_keep):
-  """Copy a file or directory from the working directory to the keep
-  directory."""
-  if not os.path.isabs(keep_directory):
-    raise Exception(f'Keep directory ({keep_directory}) is a relative path, which would be interpreted relative to the build directory ({build_directory}).  This almost certainly not what you want.  Use an absolute path for keep_directory instead.')
-  if not os.path.exists(keep_directory):
-    os.makedirs(keep_directory)
-  if os.path.isfile(file_to_keep):
-    shutil.copy2(file_to_keep, keep_directory)
-  elif os.path.isdir(file_to_keep):
-    target = os.path.join(keep_directory, file_to_keep)
-    if os.path.exists(target):
-      shutil.rmtree(target)
-    shutil.copytree(file_to_keep, target)
-  else:
-    print(file_to_keep)
-    raise Exception("Don't know how to keep %s, which is neither file nor directory." % file_to_keep)
+def keep(source, target=None):
+    """Copy a file or directory from the working directory to the keep
+    directory.  Possibly rename it or put it in a subdirectory."""
+
+    # Sanity check: Is the keep directory set reasonably?
+    if not os.path.isabs(keep_directory):
+        raise Exception(f'Keep directory ({keep_directory}) is a relative path, which would be interpreted relative to the build directory ({build_directory}).  This almost certainly not what you want.  Use an absolute path for keep_directory instead.')
+
+    # What should the destination be?
+    if target is None:
+        target = source
+    target = os.path.join(keep_directory, target)
+
+    # Make sure the destintation directory exists.  Note that we can't just
+    # check for the keep directory itself, because the target might be in a
+    # subdirectory.
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+
+    # Actually copy it to the keep directory.  One might be tempted to move the
+    # files instead of copying at this point, but that won't work --- we need
+    # the original copies in .mash, so they'll be in .mash-archive next time,
+    # so that we can tell if things need to be re-built.
+    if os.path.isfile(source):
+        shutil.copy2(source, target)
+    elif os.path.isdir(source):
+        if os.path.exists(target):
+            shutil.rmtree(target)
+        shutil.copytree(source, target)
+    else:
+        print(source)
+        raise Exception("Don't know how to keep %s, which is neither file nor directory." % source)
   
 def imprt(*fnames, target=None, conditional=False):
   """Copy one or more files to the build directory.  If target is given, there should be only one file name given, and the file will be renamed as it is imported.  If conditional=True, don't complain if the files don't exist."""
