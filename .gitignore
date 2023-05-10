@@ -4,3 +4,4 @@
 .mash-archive
 __pycache__
 old
+.coverage
