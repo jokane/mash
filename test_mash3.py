@@ -89,6 +89,12 @@ def test_file_input():
             print('[[[ a ||| b ]]]', file=output_file)
         engage(['mash3', 'test.mash'])
 
+def test_frame_stats():
+    root = tree_from_string('a\nb[[[c|||d]]]e\nf', '')
+    stats = root.stats()
+    assert stats == (2, 1, 5)
+
+
 
 # If we're run as a script, just execute all of the tests.  Or, if a
 # command line argument is given, execute only the tests containing

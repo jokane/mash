@@ -35,6 +35,7 @@ import os
 import re
 import shutil
 import sys
+import time
 
 class RestartRequest (Exception):
     """ A special exception to be raised when some part of the code wants to
@@ -168,6 +169,28 @@ class Frame:
         """Start executing the code for this frame.  Return a future holding
         the result."""
 
+    def stats(self):
+        """Return a tuple (number of frames, number of code elements, number of
+        text elements) in the entire tree."""
+
+        num_frames = 1
+        num_code = 0
+        num_text = 0
+
+        for mode, children in enumerate([self.code_children, self.text_children]):
+            for child in children:
+                if isinstance(child, Element):
+                    if mode == 0:
+                        num_code += 1
+                    else:
+                        num_text += 1
+                else:
+                    child_frames, child_code, child_text = child.stats()
+                    num_frames += child_frames
+                    num_code += child_code
+                    num_text += child_text
+        return (num_frames, num_code, num_text)
+
 def tree_from_element_seq(seq):
     """Given a sequence of elements, use the delimiters and separators to form
     the tree structure."""
@@ -212,6 +235,8 @@ def tree_from_element_seq(seq):
 def engage(argv):
     """ Actually do things, based on what the command line asked for. """
 
+    start_time = time.time()
+
     if '-c' in argv: # pragma no cover
         if os.path.exists(".mash"):
             shutil.rmtree(".mash")
@@ -235,6 +260,12 @@ def engage(argv):
     root = tree_from_string(text, input_filename)
 
     root.begin()
+
+    end_time = time.time()
+    elapsed = f'{end_time-start_time:.02f}'
+
+    stat = root.stats()
+    print(f"{stat[0]} frames; {stat[1]}+{stat[2]} elements; {elapsed} seconds")
 
 def main(): # pragma no cover
     """ Main entry point.  Mostly just logic to respond to restart requests. """
