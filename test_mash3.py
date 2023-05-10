@@ -44,9 +44,8 @@ def test_element_seq_from_string():
     # Basics.
     assert len(elements) == 9
 
-    # No exceptions from __str__ nor __repr__.
+    # No exceptions from __str__.
     elements[0].__str__()
-    elements[0].__repr__()
 
     # Deal correctly when a token is at the very start.
     tree_from_string('[[[ a ]]]', 'x')
@@ -61,13 +60,16 @@ def test_element_tree_from_string():
     assert len(root.text_children[2].code_children) == 1
     assert len(root.text_children[2].text_children) == 1
 
-    # Extra separator
-    with pytest.raises(ValueError):
-        tree_from_string('[[[ a ||| b ||| c ]]]', 'x')
+    # Extra separator, with file name and line in error message.
+    with pytest.raises(ValueError) as exception:
+        tree_from_string('[[[ a \n ||| b \n ||| c ]]]', 'xyz')
 
-    # Missing closing delimiter.
-    with pytest.raises(ValueError):
-        tree_from_string('[[[ a \n b', 'x')
+    assert 'xyz:3' in str(exception)
+
+    # Missing closing delimiter.  Error should show where the frame started.
+    with pytest.raises(ValueError) as exception:
+        tree_from_string('1  \n 2 \n 3 [[[ a \n b \n c \n d', 'abc')
+    assert 'abc:3' in str(exception)
 
     # Extra closing delimiter.
     with pytest.raises(ValueError):
