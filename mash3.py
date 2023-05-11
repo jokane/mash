@@ -120,18 +120,29 @@ def element_seq_from_string(text, source_name, start_line=1):
         priority_queue.append((start, token_type, regex, match))
     heapq.heapify(priority_queue)
 
+    text_so_far = ''
+
     # Keep emitting elements until we run out of them.
     while priority_queue:
         # Which token is next?
         start, token_type, regex, match = heapq.heappop(priority_queue)
 
-        # Is there some boring text before this token?  If so, emit it first.
+        # If there's any text before this token, keep track of it.
         if start > index:
-            yield Element(Address(source_name, line, 0), text[index:start])
+            text_so_far += text[index:start]
 
-        # Is it a newline?  If so, update the line number.
+        # Is it a newline?
+        # - If so, update the line number, but also incude it in the actual
+        # text.
+        # - If not, then the text element we (may) have been assembling is
+        # complete.
         if token_type == Token.NEWLINE:
             line += 1
+            text_so_far += '\n'
+        elif len(text_so_far) > 0:
+            yield Element(Address(source_name, line, 0), text_so_far)
+            text_so_far = ''
+
 
         # Emit this token and move forward in the text.  Except if we have a
         # negative start value, which is a special case set by the

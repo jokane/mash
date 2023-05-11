@@ -42,7 +42,7 @@ def test_element_seq_from_string():
     elements = list(element_seq_from_string('a\nb[[[ c ||| d ]]] e\n f', 'x'))
 
     # Basics.
-    assert len(elements) == 9
+    assert len(elements) == 7
 
     # No exceptions from __str__.
     elements[0].__str__()
@@ -54,11 +54,11 @@ def test_element_tree_from_string():
     # Basics
     root = tree_from_string('a\nb[[[c|||d]]]e\nf', 'x')
     assert len(root.code_children) == 0
-    assert len(root.text_children) == 5
+    assert len(root.text_children) == 3
     assert isinstance(root.text_children[0], Element)
-    assert isinstance(root.text_children[2], Frame)
-    assert len(root.text_children[2].code_children) == 1
-    assert len(root.text_children[2].text_children) == 1
+    assert isinstance(root.text_children[1], Frame)
+    assert len(root.text_children[1].code_children) == 1
+    assert len(root.text_children[1].text_children) == 1
 
     # Extra separator, with file name and line in error message.
     with pytest.raises(ValueError) as exception:
@@ -92,7 +92,7 @@ def test_file_input():
 def test_frame_stats():
     root = tree_from_string('a\nb[[[c|||d]]]e\nf', '')
     stats = root.stats()
-    assert stats == (2, 1, 5)
+    assert stats == (2, 1, 3)
 
 
 
