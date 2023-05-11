@@ -93,6 +93,16 @@ class Element:
     def __repr__(self):
         return str(self)
 
+    def execute(self):
+        """Execute the content of this element as Python code."""
+
+        # Fix the indentation.
+        source = unindent(self.content)
+
+        # Run the stuff.
+        code_obj = compile(source, self.address.filename, 'exec')
+        exec(code_obj, {}, {})
+
 def unindent(s):
     """Given a string, modify each line by removing the whitespace that appears
     at the start of the first line."""

@@ -9,6 +9,7 @@ import contextlib
 import sys
 import tempfile
 import concurrent.futures
+import traceback
 
 import pytest
 
@@ -68,15 +69,15 @@ def test_element_tree_from_string():
     print(root.text_children)
 
     # Extra separator, with file name and line in error message.
-    with pytest.raises(ValueError) as exception:
+    with pytest.raises(ValueError) as exc_info:
         tree_from_string('[[[ a \n ||| b \n ||| c ]]]', 'xyz.mash')
 
-    assert 'xyz.mash, line 3' in str(exception)
+    assert 'xyz.mash, line 3' in str(exc_info)
 
     # Missing closing delimiter.  Error should show where the frame started.
-    with pytest.raises(ValueError) as exception:
+    with pytest.raises(ValueError) as exc_info:
         tree_from_string('1  \n 2 \n 3 [[[ a \n b \n c \n d', 'abc.mash')
-    assert 'abc.mash, line 3' in str(exception)
+    assert 'abc.mash, line 3' in str(exc_info)
 
     # Extra closing delimiter.
     with pytest.raises(ValueError):
@@ -101,10 +102,28 @@ def test_frame_stats():
     stats = root.stats()
     assert stats == (2, 1, 3)
 
+def test_element_execute1():
+    # Somthing simple.
+    Element(Address('xyz.mash', 1, 1), "print('hello')").execute()
+
+def test_element_execute2():
+    # Syntax error.
+    with pytest.raises(SyntaxError):
+        Element(Address('xyz.mash', 1, 1), "print 'hello'").execute()
+
+def test_element_execute3():
+    # Correct line number.
+    with pytest.raises(Exception) as exc_info:
+        Element(Address('xyz.mash', 5, 1), "  \n\n\n  raise ValueError('sadness')").execute()
+
+    formatted_tb = '\n'.join(traceback.format_tb(exc_info._excinfo[2]))
+    assert 'xyx.mash, line 9' in formatted_tb
+
 def test_frame_execute():
     root = tree_from_string('A [[[ print("B") ]]] C', 'xyz.mash')
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
     root.execute(executor)
+
 
 
 # If we're run as a script, just execute all of the tests.  Or, if a

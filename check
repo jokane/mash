@@ -1,5 +1,5 @@
 #!/bin/bash
 set -e
 pylint *.py || true
-coverage run --omit=/usr*,/opt* -m pytest --durations=5
+coverage run --omit=/usr*,/opt*,*.mash -m pytest --durations=5
 coverage report -m
