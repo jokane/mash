@@ -8,6 +8,7 @@
 import contextlib
 import sys
 import tempfile
+import concurrent.futures
 
 import pytest
 
@@ -52,7 +53,7 @@ def test_element_seq_from_string():
 
 def test_element_tree_from_string():
     # Basics
-    root = tree_from_string('a\nb[[[c|||d]]]e\nf', 'x')
+    root = tree_from_string('a\nb[[[c|||d]]]e\nf', 'x.mash')
     assert len(root.code_children) == 0
     assert len(root.text_children) == 3
     assert isinstance(root.text_children[0], Element)
@@ -60,16 +61,18 @@ def test_element_tree_from_string():
     assert len(root.text_children[1].code_children) == 1
     assert len(root.text_children[1].text_children) == 1
 
+    print(root.text_children)
+
     # Extra separator, with file name and line in error message.
     with pytest.raises(ValueError) as exception:
-        tree_from_string('[[[ a \n ||| b \n ||| c ]]]', 'xyz')
+        tree_from_string('[[[ a \n ||| b \n ||| c ]]]', 'xyz.mash')
 
-    assert 'xyz:3' in str(exception)
+    assert 'xyz.mash, line 3' in str(exception)
 
     # Missing closing delimiter.  Error should show where the frame started.
     with pytest.raises(ValueError) as exception:
-        tree_from_string('1  \n 2 \n 3 [[[ a \n b \n c \n d', 'abc')
-    assert 'abc:3' in str(exception)
+        tree_from_string('1  \n 2 \n 3 [[[ a \n b \n c \n d', 'abc.mash')
+    assert 'abc.mash, line 3' in str(exception)
 
     # Extra closing delimiter.
     with pytest.raises(ValueError):
@@ -94,6 +97,10 @@ def test_frame_stats():
     stats = root.stats()
     assert stats == (2, 1, 3)
 
+def test_frame_execute():
+    root = tree_from_string('A [[[ print("B") ]]] C', 'xyz.mash')
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+    root.execute(executor)
 
 
 # If we're run as a script, just execute all of the tests.  Or, if a

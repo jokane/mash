@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
+"""This is a tool that allows text in various languages to be stored together
+in a single input file. along with instructions for manipulating, mutating, and
+storing that text."""
+
 # -- mash --
 #
-# This is a tool that allows text in various languages to be stored together
-# in a single input file. along with instructions for manipulating, mutating,
-# and storing that text.
 #
 # Q. Why?
 #
@@ -26,9 +27,7 @@
 #   2019-04-02: Starting major rewrite, replacing custom language with Python.
 #   2022-11-17: Starting second major overall, to allow parallel execution.
 
-"""Tools for parsing mash text by finding opening delimiters ([[[) ,
-separators (|||) , and closing delimiters (]]])."""
-
+import concurrent.futures
 import enum
 import heapq
 import os
@@ -62,7 +61,7 @@ class Address:
         self.offset = offset
 
     def __str__(self):
-        return f'{self.filename}:{self.lineno}({self.offset}):'
+        return f'({self.filename}, line {self.lineno}, pos {self.offset})'
 
     def exception(self, message):
         """Something went wrong at this address.  Complain, mentioning the
@@ -84,7 +83,13 @@ class Element:
         self.content = content
 
     def __str__(self):
-        return f'{self.address}: {self.content}'
+        return f'{self.address} {repr(self.content)}'
+
+    def as_indented_string(self, indent_level=0):
+        return f'{"  "*indent_level}{str(self)}\n'
+
+    def __repr__(self):
+        return str(self)
 
 
 def tree_from_string(text, source_name, start_line=1):
@@ -175,10 +180,57 @@ class Frame:
         self.code_children = []
         self.text_children = []
         self.separated = False
+        self.result = 'No!'
 
-    def begin(self):
-        """Start executing the code for this frame.  Return a future holding
-        the result."""
+    def __str__(self):
+        return self.as_indented_string()
+    
+    def all_children(self):
+        yield from self.code_children
+        yield from self.text_children
+
+    def as_indented_string(self, indent_level=0):
+        r = ''
+        r += ('  '*indent_level) + '[[[\n'
+        for child in self.code_children:
+            r += child.as_indented_string(indent_level+1)
+        r += ('  '*indent_level) + '  |||\n'
+        for child in self.text_children:
+            r += child.as_indented_string(indent_level+1)
+        r += ('  '*indent_level) + ']]]\n'
+        return r
+
+    def execute(self, executor):
+        """Do the work for this frame.  Run each of the children, pull their
+        results, and then run any code elements here.  Use the given executor
+        to manage any parallel tasks."""
+        print(self.as_indented_string())
+
+        # Start executing all of the child frames.
+        child_futures = []
+        for child in self.all_children():
+            if not isinstance(child, Frame): continue
+            future = executor.submit(child.execute, executor)
+            child_futures.append(future)
+
+        # Wait for all of the child frames to finish.
+        for child_future in child_futures:
+            child_future.result()
+
+        # Check for results from any of the children.
+        for i, child in enumerate(self.text_children):
+            if not isinstance(child, Frame): continue
+            self.text_children[i] = self.text_children[i].to_element()
+            print(self.as_indented_string())
+
+            
+        self.result = 'yes!'
+
+        print('done')
+            
+    def to_element(self):
+        """Return an element representing the result from this frame."""
+        return Element(self.address, self.result)
 
     def stats(self):
         """Return a tuple (number of frames, number of code elements, number of
@@ -270,7 +322,8 @@ def engage(argv):
 
     root = tree_from_string(text, input_filename)
 
-    root.begin()
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+    root.execute(executor)
 
     end_time = time.time()
     elapsed = f'{end_time-start_time:.02f}'
