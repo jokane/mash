@@ -86,11 +86,26 @@ class Element:
         return f'{self.address} {repr(self.content)}'
 
     def as_indented_string(self, indent_level=0):
+        """Return a nicely-formatted representation of this element, indented
+        as requested."""
         return f'{"  "*indent_level}{str(self)}\n'
 
     def __repr__(self):
         return str(self)
 
+def unindent(s):
+    """Given a string, modify each line by removing the whitespace that appears
+    at the start of the first line."""
+    # Find the prefix that we want to remove.  It is the sequence
+    # of tabs or spaces that preceeds the first real character.
+    match = re.search(r'([ \t]*)[^ \t\n]', s, re.M)
+
+    # If we found a prefix, remove it from the start of every line.
+    if match:
+        prefix = match.group(1)
+        s = re.sub('\n' + prefix, '\n', s)
+        s = re.sub('^' + prefix, '', s)
+    return s
 
 def tree_from_string(text, source_name, start_line=1):
     """Given a string, parse the string as a mash document.  Return the root frame."""
@@ -182,14 +197,15 @@ class Frame:
         self.separated = False
         self.result = 'No!'
 
-    def __str__(self):
-        return self.as_indented_string()
-    
     def all_children(self):
+        """A sequence of all of the children of this frame, both code and
+        text."""
         yield from self.code_children
         yield from self.text_children
 
     def as_indented_string(self, indent_level=0):
+        """Return a nicely-formatted representation of this frame, including
+        its descendants, indented as requested."""
         r = ''
         r += ('  '*indent_level) + '[[[\n'
         for child in self.code_children:
@@ -223,11 +239,10 @@ class Frame:
             self.text_children[i] = self.text_children[i].to_element()
             print(self.as_indented_string())
 
-            
         self.result = 'yes!'
 
         print('done')
-            
+
     def to_element(self):
         """Return an element representing the result from this frame."""
         return Element(self.address, self.result)
@@ -314,8 +329,6 @@ def engage(argv):
         input_filename = '/dev/stdin'
     else:
         input_filename = argv[1]
-
-    original_directory = os.getcwd()
 
     with open(input_filename, 'r', encoding='utf-8') as input_file:
         text = input_file.read()

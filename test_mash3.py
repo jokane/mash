@@ -39,6 +39,10 @@ def temporary_current_directory():
             finally:
                 pass
 
+def test_unindent():
+    code = "    print('hello')\n    print('world')"
+    assert len(code) - len(unindent(code)) == 8
+
 def test_element_seq_from_string():
     elements = list(element_seq_from_string('a\nb[[[ c ||| d ]]] e\n f', 'x'))
 
