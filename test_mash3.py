@@ -4,6 +4,7 @@
 # pylint: disable=wildcard-import
 # pylint: disable=too-many-lines
 # pylint: disable=unused-wildcard-import
+# pylint: disable=protected-access
 
 import contextlib
 import sys
@@ -117,7 +118,7 @@ def test_element_execute3():
         Element(Address('xyz.mash', 5, 1), "  \n\n\n  raise ValueError('sadness')").execute()
 
     formatted_tb = '\n'.join(traceback.format_tb(exc_info._excinfo[2]))
-    assert 'xyx.mash, line 9' in formatted_tb
+    assert '"xyz.mash", line 8' in formatted_tb
 
 def test_frame_execute():
     root = tree_from_string('A [[[ print("B") ]]] C', 'xyz.mash')

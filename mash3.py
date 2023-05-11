@@ -99,6 +99,10 @@ class Element:
         # Fix the indentation.
         source = unindent(self.content)
 
+        # Shift so that the line numbers in any exceptions match the actual
+        # source address.
+        source = ('\n'*(self.address.lineno-1)) + source
+
         # Run the stuff.
         code_obj = compile(source, self.address.filename, 'exec')
         exec(code_obj, {}, {})
