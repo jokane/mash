@@ -116,8 +116,8 @@ class FrameTreeNode(ABC):
 
     @abstractmethod
     def execute(self, executor):
-        """Do the work represented by this node, if any.  Return an object that
-        should replace this one in the tree."""
+        """Do the work represented by this node, if any.  Return a list of
+        objects that should replace this one in the tree."""
 
     @abstractmethod
     def as_indented_string(self, indent_level=0):
@@ -152,15 +152,24 @@ class Frame(FrameTreeNode):
         print(self.as_indented_string())
 
         # A helper for executing things and waiting for them to finish.
-        def execute_children(executor, seq):
+        def execute_children(executor, frames_only):
             """Allow each child in the given list to execute in parallel.  Wait for
             all of them to finish."""
-            child_futures = []
-            for child in seq:
-                future = executor.submit(child.execute, executor)
-                child_futures.append(future)
-            for child_future in child_futures:
-                child_future.result()
+            futures = []
+            for child in self.children:
+                if frames_only and not isinstance(child, Frame):
+                    future = [ child ]
+                else:
+                    future = executor.submit(child.execute, executor)
+                futures.append(future)
+
+            new_children = []
+            for future in futures:
+                if isinstance(future, list):
+                    new_children += future
+                else:
+                    new_children += future.result()
+            self.children = new_children
 
         # Execute all of the child frames.
         child_frames = [ child for child in self.children if isinstance(child, Frame)]
@@ -170,16 +179,8 @@ class Frame(FrameTreeNode):
         # Execute each of them.
         execute_children(executor, self.children)
 
-        # # If any children produced results, insert them into the list.
-        # def replace_child_frames_with_elements(lst):
-        #     for i, child in enumerate(lst):
-        #         if not isinstance(child, Frame): continue
-        #         self.text_children[i] = self.text_children[i].to_element()
-        # replace_child_frames_with_elements(self.code_children)
-        # replace_child_frames_with_elements(self.text_children)
-
-
-        # print('done')
+        # All done.
+        return self.children
 
     def stats(self):
         return sum([child.stats() for child in self.children], start=Stats(1, 0, 0))
@@ -215,6 +216,8 @@ class CodeLeaf(FrameTreeLeaf):
         code_obj = compile(source, self.address.filename, 'exec')
         exec(code_obj, {}, {})
 
+        return [ TextLeaf(self.address, self.parent, ''), ]
+
     def line_marker(self):
         return '*'
 
@@ -226,7 +229,9 @@ class TextLeaf(FrameTreeLeaf):
 
     def execute(self, executor):
         """ Nothing to do here."""
-        return self
+        print("Executing this text leaf:")
+        print(self.as_indented_string())
+        return [ self, ]
 
     def line_marker(self):
         return '.'

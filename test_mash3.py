@@ -133,7 +133,6 @@ def test_textleaf_execute2():
     # Text leaves don't execute their content as code -- no exception here.
     TextLeaf(Address('xyz.mash', 1, 1), None, "print 'hello'").execute(get_executor())
 
-
 def test_frame_execute():
     root = tree_from_string('A [[[ print("B") ]]] C', 'xyz.mash')
     root.execute(get_executor())
