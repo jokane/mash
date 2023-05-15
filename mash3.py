@@ -93,7 +93,7 @@ class Element:
     def __repr__(self):
         return str(self)
 
-    def execute(self):
+    def execute(self, executor=None):
         """Execute the content of this element as Python code."""
 
         # Fix the indentation.
@@ -230,28 +230,44 @@ class Frame:
         r += ('  '*indent_level) + ']]]\n'
         return r
 
+
+
     def execute(self, executor):
         """Do the work for this frame.  Run each of the children, pull their
         results, and then run any code elements here.  Use the given executor
         to manage any parallel tasks."""
         print(self.as_indented_string())
 
+        # A helper for executing things and waiting for them to finish.
+        def execute_children(executor, seq):
+            """Allow each child in the given list to execute in parallel.  Wait for
+            all of them to finish."""
+
+            # Start 'em all.
+            child_futures = []
+            for child in seq:
+                future = executor.submit(child.execute, executor)
+                child_futures.append(future)
+
+            # Wait for all of the child frames to finish.
+            for child_future in child_futures:
+                child_future.result()
+
         # Start executing all of the child frames.
-        child_futures = []
-        for child in self.all_children():
-            if not isinstance(child, Frame): continue
-            future = executor.submit(child.execute, executor)
-            child_futures.append(future)
+        child_frames = [ child for child in self.all_children() if isinstance(child, Frame)]
+        execute_children(executor, child_frames)
 
-        # Wait for all of the child frames to finish.
-        for child_future in child_futures:
-            child_future.result()
+        # If any children produced results, insert them into the list.
+        def replace_child_frames_with_elements(lst):
+            for i, child in enumerate(lst):
+                if not isinstance(child, Frame): continue
+                self.text_children[i] = self.text_children[i].to_element()
+        replace_child_frames_with_elements(self.code_children)
+        replace_child_frames_with_elements(self.text_children)
 
-        # Check for results from any of the children.
-        for i, child in enumerate(self.text_children):
-            if not isinstance(child, Frame): continue
-            self.text_children[i] = self.text_children[i].to_element()
-            print(self.as_indented_string())
+        # Children are done.  Now execute our own code, i.e. any elements in
+        # our list of code children.
+        execute_children(executor, self.code_children)
 
         self.result = 'yes!'
 

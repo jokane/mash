@@ -95,7 +95,7 @@ def test_dash_c():
 def test_file_input():
     with temporary_current_directory():
         with open('test.mash', 'w', encoding='utf-8') as output_file:
-            print('[[[ a ||| b ]]]', file=output_file)
+            print('[[[ print() ||| b ]]]', file=output_file)
         engage(['mash3', 'test.mash'])
 
 def test_frame_stats():
@@ -131,7 +131,7 @@ def test_frame_execute():
 # command line argument is given, execute only the tests containing
 # that pattern.
 
-def test_from_pattern(): #pragma nocover
+def run_tests_from_pattern(): #pragma nocover
     pattern = ''
     try:
         pattern = sys.argv[1]
@@ -147,4 +147,4 @@ def test_from_pattern(): #pragma nocover
             print()
 
 if __name__ == '__main__':  #pragma: nocover
-    test_from_pattern()
+    run_tests_from_pattern()
