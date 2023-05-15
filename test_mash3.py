@@ -41,6 +41,9 @@ def temporary_current_directory():
             finally:
                 pass
 
+def get_executor():
+    return concurrent.futures.ThreadPoolExecutor(max_workers=4)
+
 def test_unindent():
     code = "    print('hello')\n    print('world')"
     assert len(code) - len(unindent(code)) == 8
@@ -60,14 +63,14 @@ def test_element_seq_from_string():
 def test_element_tree_from_string():
     # Basics
     root = tree_from_string('a\nb[[[c|||d]]]e\nf', 'x.mash')
-    assert len(root.code_children) == 0
-    assert len(root.text_children) == 3
-    assert isinstance(root.text_children[0], Element)
-    assert isinstance(root.text_children[1], Frame)
-    assert len(root.text_children[1].code_children) == 1
-    assert len(root.text_children[1].text_children) == 1
+    print(root.as_indented_string())
+    assert len(root.children) == 3
+    assert isinstance(root.children[0], TextLeaf)
+    assert isinstance(root.children[1], Frame)
+    assert len(root.children[1].children) == 2
+    assert isinstance(root.children[1].children[0], CodeLeaf)
+    assert isinstance(root.children[1].children[1], TextLeaf)
 
-    print(root.text_children)
 
     # Extra separator, with file name and line in error message.
     with pytest.raises(ValueError) as exc_info:
@@ -101,29 +104,52 @@ def test_file_input():
 def test_frame_stats():
     root = tree_from_string('a\nb[[[c|||d]]]e\nf', '')
     stats = root.stats()
-    assert stats == (2, 1, 3)
+    assert stats == Stats(2, 1, 3)
 
-def test_element_execute1():
+def test_codeleaf_execute1():
     # Somthing simple.
-    Element(Address('xyz.mash', 1, 1), "print('hello')").execute()
+    CodeLeaf(Address('xyz.mash', 1, 1), None, "print('hello')").execute(get_executor())
 
-def test_element_execute2():
+def test_codeleaf_execute2():
     # Syntax error.
     with pytest.raises(SyntaxError):
-        Element(Address('xyz.mash', 1, 1), "print 'hello'").execute()
+        CodeLeaf(Address('xyz.mash', 1, 1), None, "print 'hello'").execute(get_executor())
 
-def test_element_execute3():
+def test_codeleaf_execute3():
     # Correct line number.
     with pytest.raises(Exception) as exc_info:
-        Element(Address('xyz.mash', 5, 1), "  \n\n\n  raise ValueError('sadness')").execute()
+        CodeLeaf(Address('xyz.mash', 5, 1),
+                 None,
+                 "  \n\n\n  raise ValueError('sadness')").execute(get_executor())
 
     formatted_tb = '\n'.join(traceback.format_tb(exc_info._excinfo[2]))
     assert '"xyz.mash", line 8' in formatted_tb
 
+def test_textleaf_execute1():
+    # Simple.
+    TextLeaf(Address('xyz.mash', 1, 1), None, "print('hello')").execute(get_executor())
+
+def test_textleaf_execute2():
+    # Text leaves don't execute their content as code -- no exception here.
+    TextLeaf(Address('xyz.mash', 1, 1), None, "print 'hello'").execute(get_executor())
+
+
 def test_frame_execute():
     root = tree_from_string('A [[[ print("B") ]]] C', 'xyz.mash')
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
-    root.execute(executor)
+    root.execute(get_executor())
+
+def test_frame_execute2():
+    # Check recursive execution, normal case.
+    root = tree_from_string('[[[ print("B") ||| [[[ print("C") ||| D ]]] ]]]', 'xyz.mash')
+    root.execute(get_executor())
+
+
+def test_frame_execute3():
+    # Check recursive execution, failing.
+    root = tree_from_string('[[[ print("B") ||| [[[ print C ||| D ]]] ]]]', 'xyz.mash')
+    with pytest.raises(SyntaxError):
+        root.execute(get_executor())
+
 
 
 

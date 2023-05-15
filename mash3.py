@@ -36,11 +36,11 @@ import shutil
 import sys
 import time
 
+from abc import ABC, abstractmethod
+
 class RestartRequest (Exception):
     """ A special exception to be raised when some part of the code wants to
     start the entire process over. """
-
-
 
 class Token(enum.Enum):
     """A token that represents a bit of mash syntax."""
@@ -73,10 +73,10 @@ class Address:
         raise exception
 
 class Element:
-    """An element represents either a single string, a token indicating the
-    start or end of a frame, or a separator token marking the difference
-    between code and text parts of a frame.  Each of these associated with an
-    address where it started."""
+    """A single string, a token indicating the start or end of a frame, or a
+    separator token marking the difference between code and text parts of a
+    frame.  Each of these associated with an address where it started.  Used in
+    the process of parsing the frame tree."""
 
     def __init__(self, address, content):
         self.address = address
@@ -85,16 +85,124 @@ class Element:
     def __str__(self):
         return f'{self.address} {repr(self.content)}'
 
+class Stats:
+    """Statistics for the complexity of a frame tree."""
+    def __init__(self, frames, code, text):
+        self.frames = frames
+        self.code = code
+        self.text = text
+
+    def __add__(self, other):
+        return Stats(self.frames + other.frames,
+                     self.code + other.code,
+                     self.text + other.text)
+
+    def __eq__(self, other):
+        return (self.frames == other.frames
+                and self.code == other.code
+                and self.text == other.text)
+
+    def __str__(self):
+        return f'{self.frames} frames; {self.code}+{self.text} leaves'
+
+class FrameTreeNode(ABC):
+    """A node in the frame tree.  Could be a frame (i.e. an internal node), a
+    text block (a leaf containing completed text) or a code block (a leaf
+    containing code to be executed)."""
+
+    def __init__(self, address, parent):
+        self.address = address
+        self.parent = parent
+
+    @abstractmethod
+    def execute(self, executor):
+        """Do the work represented by this node, if any.  Return an object that
+        should replace this one in the tree."""
+
+    @abstractmethod
     def as_indented_string(self, indent_level=0):
-        """Return a nicely-formatted representation of this element, indented
-        as requested."""
-        return f'{"  "*indent_level}{str(self)}\n'
+        """Return a nicely-formatted representation of this node, including
+        its descendants, indented two spaces for each level."""
 
-    def __repr__(self):
-        return str(self)
+    @abstractmethod
+    def stats(self):
+        """Return a Stats object for this node and its descendants."""
 
-    def execute(self, executor=None):
-        """Execute the content of this element as Python code."""
+class Frame(FrameTreeNode):
+    """A frame represents a block containing some text along with code that
+    should operate on that text."""
+    def __init__(self, address, parent):
+        super().__init__(address, parent)
+        self.children = []
+        self.separated = False
+
+    def as_indented_string(self, indent_level=0):
+        r = ''
+        r += ('  '*indent_level) + '[[[\n'
+        for child in self.children:
+            r += child.as_indented_string(indent_level+1)
+        r += ('  '*indent_level) + ']]]\n'
+        return r
+
+    def execute(self, executor):
+        """Do the work for this frame.  Run each of the children, pull their
+        results, and then run any code elements here.  Use the given executor
+        to manage any parallel tasks."""
+        print("Executing this frame:")
+        print(self.as_indented_string())
+
+        # A helper for executing things and waiting for them to finish.
+        def execute_children(executor, seq):
+            """Allow each child in the given list to execute in parallel.  Wait for
+            all of them to finish."""
+            child_futures = []
+            for child in seq:
+                future = executor.submit(child.execute, executor)
+                child_futures.append(future)
+            for child_future in child_futures:
+                child_future.result()
+
+        # Execute all of the child frames.
+        child_frames = [ child for child in self.children if isinstance(child, Frame)]
+        execute_children(executor, child_frames)
+
+        # Child frames are done.  Our child list should now be just leaves.
+        # Execute each of them.
+        execute_children(executor, self.children)
+
+        # # If any children produced results, insert them into the list.
+        # def replace_child_frames_with_elements(lst):
+        #     for i, child in enumerate(lst):
+        #         if not isinstance(child, Frame): continue
+        #         self.text_children[i] = self.text_children[i].to_element()
+        # replace_child_frames_with_elements(self.code_children)
+        # replace_child_frames_with_elements(self.text_children)
+
+
+        # print('done')
+
+    def stats(self):
+        return sum([child.stats() for child in self.children], start=Stats(1, 0, 0))
+
+class FrameTreeLeaf(FrameTreeNode):
+    """A leaf node.  Base class for CodeLeaf and TextLeaf."""
+    def __init__(self, address, parent, content):
+        super().__init__(address, parent)
+        self.content = content
+
+    @abstractmethod
+    def line_marker(self):
+        """A short string to mark what kind of leaf this is."""
+
+    def as_indented_string(self, indent_level=0):
+        return ('  '*indent_level) + f'{self.line_marker()} {self.content.__repr__()}\n'
+
+class CodeLeaf(FrameTreeLeaf):
+    """A leaf node representing Python code to be executed."""
+    def execute(self, executor):
+        """ Execute our text as Python code."""
+        print("Executing this code leaf:")
+        print(self.as_indented_string())
 
         # Fix the indentation.
         source = unindent(self.content)
@@ -106,6 +214,25 @@ class Element:
         # Run the stuff.
         code_obj = compile(source, self.address.filename, 'exec')
         exec(code_obj, {}, {})
+
+    def line_marker(self):
+        return '*'
+
+    def stats(self):
+        return Stats(0, 1, 0)
+
+class TextLeaf(FrameTreeLeaf):
+    """A leaf node representing just text."""
+
+    def execute(self, executor):
+        """ Nothing to do here."""
+        return self
+
+    def line_marker(self):
+        return '.'
+
+    def stats(self):
+        return Stats(0, 0, 1)
 
 def unindent(s):
     """Given a string, modify each line by removing the whitespace that appears
@@ -200,105 +327,6 @@ def element_seq_from_string(text, source_name, start_line=1):
     if index < len(text):
         yield Element(Address(source_name, line, 0), text[index:])
 
-class Frame:
-    """A frame represents a block containing some text along with code that
-    should operate on that text."""
-    def __init__(self, address, parent):
-        self.parent = parent
-        self.address = address
-        self.code_children = []
-        self.text_children = []
-        self.separated = False
-        self.result = 'No!'
-
-    def all_children(self):
-        """A sequence of all of the children of this frame, both code and
-        text."""
-        yield from self.code_children
-        yield from self.text_children
-
-    def as_indented_string(self, indent_level=0):
-        """Return a nicely-formatted representation of this frame, including
-        its descendants, indented as requested."""
-        r = ''
-        r += ('  '*indent_level) + '[[[\n'
-        for child in self.code_children:
-            r += child.as_indented_string(indent_level+1)
-        r += ('  '*indent_level) + '  |||\n'
-        for child in self.text_children:
-            r += child.as_indented_string(indent_level+1)
-        r += ('  '*indent_level) + ']]]\n'
-        return r
-
-
-
-    def execute(self, executor):
-        """Do the work for this frame.  Run each of the children, pull their
-        results, and then run any code elements here.  Use the given executor
-        to manage any parallel tasks."""
-        print(self.as_indented_string())
-
-        # A helper for executing things and waiting for them to finish.
-        def execute_children(executor, seq):
-            """Allow each child in the given list to execute in parallel.  Wait for
-            all of them to finish."""
-
-            # Start 'em all.
-            child_futures = []
-            for child in seq:
-                future = executor.submit(child.execute, executor)
-                child_futures.append(future)
-
-            # Wait for all of the child frames to finish.
-            for child_future in child_futures:
-                child_future.result()
-
-        # Start executing all of the child frames.
-        child_frames = [ child for child in self.all_children() if isinstance(child, Frame)]
-        execute_children(executor, child_frames)
-
-        # If any children produced results, insert them into the list.
-        def replace_child_frames_with_elements(lst):
-            for i, child in enumerate(lst):
-                if not isinstance(child, Frame): continue
-                self.text_children[i] = self.text_children[i].to_element()
-        replace_child_frames_with_elements(self.code_children)
-        replace_child_frames_with_elements(self.text_children)
-
-        # Children are done.  Now execute our own code, i.e. any elements in
-        # our list of code children.
-        execute_children(executor, self.code_children)
-
-        self.result = 'yes!'
-
-        print('done')
-
-    def to_element(self):
-        """Return an element representing the result from this frame."""
-        return Element(self.address, self.result)
-
-    def stats(self):
-        """Return a tuple (number of frames, number of code elements, number of
-        text elements) in the entire tree."""
-
-        num_frames = 1
-        num_code = 0
-        num_text = 0
-
-        for mode, children in enumerate([self.code_children, self.text_children]):
-            for child in children:
-                if isinstance(child, Element):
-                    if mode == 0:
-                        num_code += 1
-                    else:
-                        num_text += 1
-                else:
-                    child_frames, child_code, child_text = child.stats()
-                    num_frames += child_frames
-                    num_code += child_code
-                    num_text += child_text
-        return (num_frames, num_code, num_text)
-
 def tree_from_element_seq(seq):
     """Given a sequence of elements, use the delimiters and separators to form
     the tree structure."""
@@ -316,16 +344,15 @@ def tree_from_element_seq(seq):
             # considered text.
             root.separated = True
 
-        if not frame.separated:
-            current_list = frame.code_children
-        else:
-            current_list = frame.text_children
-
         if isinstance(element.content, str):
-            current_list.append(element)
+            if frame.separated:
+                leaf = TextLeaf(element.address, frame, element.content)
+            else:
+                leaf = CodeLeaf(element.address, frame, element.content)
+            frame.children.append(leaf)
         elif element.content == Token.OPEN:
             frame = Frame(element.address, frame)
-            current_list.append(frame)
+            frame.parent.children.append(frame)
         elif element.content == Token.CLOSE:
             if frame.parent is None:
                 element.address.exception("Closing delimiter (]]]) found at top level.")
@@ -371,8 +398,8 @@ def engage(argv):
     end_time = time.time()
     elapsed = f'{end_time-start_time:.02f}'
 
-    stat = root.stats()
-    print(f"{stat[0]} frames; {stat[1]}+{stat[2]} elements; {elapsed} seconds")
+    stats = root.stats()
+    print(f"{stats}; {elapsed} seconds")
 
 def main(): # pragma no cover
     """ Main entry point.  Mostly just logic to respond to restart requests. """
