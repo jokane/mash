@@ -369,6 +369,7 @@ def tree_from_element_seq(seq):
     the tree structure."""
 
     frame = None
+    root = None
 
     # Put each element into a frame.
     for element in seq:
@@ -399,7 +400,7 @@ def tree_from_element_seq(seq):
                 element.address.exception("Multiple separators (|||) in a single frame.")
             frame.separated = True
 
-    if frame != root:
+    if root is not None and frame != root:
         frame.address.exception('Frame was never closed.')
 
     return frame
@@ -410,7 +411,7 @@ def engage(argv):
 
     start_time = time.time()
 
-    if '-c' in argv: # pragma no cover
+    if '-c' in argv:
         if os.path.exists(".mash"):
             shutil.rmtree(".mash")
         if os.path.exists(".mash-archive"):
@@ -419,7 +420,7 @@ def engage(argv):
         if len(argv) == 1:
             return
 
-    if len(argv) == 1: # pragma no cover
+    if len(argv) == 1:
         print('[reading from stdin]')
         input_filename = '/dev/stdin'
     else:
@@ -429,6 +430,10 @@ def engage(argv):
         text = input_file.read()
 
     root = tree_from_string(text, input_filename)
+
+    if root is None:
+        print('Input seems to be empty.')
+        return
 
     root.execute()
 

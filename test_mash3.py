@@ -99,6 +99,9 @@ def test_file_input():
             print('[[[ print() ||| b ]]]', file=output_file)
         engage(['mash3', 'test.mash'])
 
+def test_stdin_input():
+    engage(['mash3'])
+
 def test_frame_stats():
     root = tree_from_string('a\nb[[[c|||d]]]e\nf', '')
     stats = root.stats()
@@ -223,6 +226,8 @@ def test_restart_request2():
         main(['mash3', 'test.mash'])
         assert os.path.exists('1')
         assert os.path.exists('2')
+
+
 
 # If we're run as a script, just execute all of the tests.  Or, if a
 # command line argument is given, execute only the tests containing
