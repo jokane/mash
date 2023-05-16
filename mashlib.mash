@@ -1,0 +1,50 @@
+[[[
+# vim: set ft=python :
+
+import shutil
+import resource
+import subprocess
+
+# A library of "standard" functions that provide many of the basic operations
+# that one might want to do on a mash frame.  Most mash documents will include
+# this near the start. 
+
+# First, some initialization.  This should only happen once.
+try:
+    mashlib_initialized
+except NameError:
+    mashlib_initialized = False
+
+    # A list of executable names whose existence we have already verified.
+    executables_checked = set()
+
+if not mashlib_initialized:
+    mashlib_initialized = True
+
+def check_for_executable(exe):
+    """
+    Check whether some executable with the given name exists in the path.  If it
+    does not exist, complain.
+    """
+    if exe not in executables_checked and shutil.which(exe) is None:
+        raise Exception(f'Executable {exe} not found in path.')
+    executables_checked.add(exe)
+
+def shell(command, stdin=None, check=True):
+    """Execute the given command in a shell.  Raise subprocess.CalledProcessError
+    if the command gives a non-zero return code.  Return the CompletedProcess
+    object, which has stdout and stderr attributes.  In addition, this object
+    has attributes tacked on to it showing the user time and system time
+    consumed, as reported by getrusage."""
+
+    if check:
+        check_for_executable(command.split(' ')[0])
+    print("  ", command)
+    usage_before = resource.getrusage(resource.RUSAGE_CHILDREN)
+    completed_process = subprocess.run(command, shell=True, check=True, input=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60000)
+    usage_after = resource.getrusage(resource.RUSAGE_CHILDREN)
+    completed_process.user_time = usage_after.ru_utime - usage_before.ru_utime
+    completed_process.sys_time = usage_after.ru_stime - usage_before.ru_stime
+    return completed_process
+
+]]]

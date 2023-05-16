@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# pylint: disable=too-many-branches
 # pylint: disable=too-few-public-methods
 # pylint: disable=invalid-name
 # pylint: disable=exec-used
@@ -36,6 +37,7 @@ import heapq
 import os
 import re
 import shutil
+import subprocess
 import sys
 import time
 import copy
@@ -134,11 +136,12 @@ class FrameTreeNode(ABC):
 
     def announce(self, variables):
         """Print some details about this node, to be called just before executing."""
-        if variables is None:
-            variables = self.default_variables()
-        print(f"Executing this {type(self)} with {len(variables)} variables:")
-        print(self.as_indented_string(indent_level=1), end='')
-        print()
+        # if variables is None:
+        #     variables = self.default_variables()
+        # print(f"Executing {type(self)} with variables ({variables.keys()}):")
+
+        # print(self.as_indented_string(indent_level=1), end='')
+        # print()
 
     def default_variables(self):
         """Return a dictionary to use as the variables in cases where no
@@ -410,7 +413,11 @@ def tree_from_element_seq(seq):
             if frame.separated:
                 leaf = TextLeaf(element.address, frame, element.content)
             else:
-                leaf = CodeLeaf(element.address, frame, element.content)
+                match = re.match(r'\s*include\s+(\S+)\s*', element.content)
+                if match:
+                    leaf = IncludeLeaf(element.address, frame, match.group(1))
+                else:
+                    leaf = CodeLeaf(element.address, frame, element.content)
             frame.children.append(leaf)
         elif element.content == Token.OPEN:
             frame = Frame(element.address, frame)
@@ -448,12 +455,20 @@ def engage(argv):
     else:
         input_filename = argv[1]
 
-    _, stats = IncludeLeaf(Address(input_filename, 1, 1), None, input_filename).execute()
+    try:
+        result, _ = IncludeLeaf(Address(input_filename, 1, 1), None, input_filename).execute()
+    except subprocess.CalledProcessError as e:
+        print(e)
+        print(e.stdout.decode("utf-8", errors='ignore'))
+        print(e.stderr.decode("utf-8", errors='ignore'))
+        return
 
     end_time = time.time()
     elapsed = f'{end_time-start_time:.02f}'
 
-    print(f"{stats}; {elapsed} seconds")
+    if len(result) > 0:
+        stats = result[0].stats()
+        print(f"{stats}; {elapsed} seconds")
 
 def main(argv):
     """ Main entry point.  Mostly just logic to respond to restart requests. """

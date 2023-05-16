@@ -4,11 +4,11 @@
 # pylint: disable=unused-wildcard-import
 # pylint: disable=protected-access
 
-"""Tests for mash.  Usually run via the check script, but can be used from the
-command line as well to run single tests."""
-
+"""Tests for mash and mashlib.  Usually run via the check script, but can be
+used from the command line as well to run single tests."""
 
 import contextlib
+import subprocess
 import sys
 import tempfile
 import traceback
@@ -31,12 +31,18 @@ def temporarily_changed_directory(directory):
 
 
 @contextlib.contextmanager
-def temporary_current_directory():
+def temporary_current_directory(linked_files=None):
     """Create a context in which the current directory is a new temporary
-    directory.  When the context ends, the current directory is restored and
-    the temporary directory is vaporized."""
+    directory.  In this temporary directory, create symlinks to the given
+    files.  When the context ends, the current directory is restored and the
+    temporary directory is vaporized."""
+
+    linked_files = linked_files if linked_files else []
+    linked_files = [os.path.abspath(x) for x in linked_files]
     with tempfile.TemporaryDirectory() as temporary_dir:
         with temporarily_changed_directory(temporary_dir):
+            for linked_file in linked_files:
+                os.symlink(linked_file, os.path.join(temporary_dir, os.path.basename(linked_file)))
             try:
                 yield
             finally:
@@ -120,10 +126,17 @@ def test_file_input():
 def test_stdin_input():
     engage(['mash3'])
 
-def test_frame_stats():
+def test_frame_stats1():
     root = tree_from_string('a\nb[[[c|||d]]]e\nf', '')
     stats = root.stats()
     assert stats == Stats(2, 1, 3)
+
+def test_frame_stats2():
+    root = tree_from_string('[[[ include abc ]]]', '')
+    print(root.as_indented_string())
+    stats = root.stats()
+    print(stats)
+    assert stats == Stats(2, 0, 1)
 
 def test_codeleaf_execute1():
     # Somthing simple.
@@ -250,18 +263,55 @@ def test_include():
     # Included files are found and imported.
     with temporary_current_directory():
         with open('included.mash', 'w', encoding='utf-8') as output_file:
-            print('[[[ def foo(x):\n    return "bar"]]]',
+            print('[[[ def foo():\n    return "bar"]]]',
                   file=output_file)
         code = """
             [[[
                 [[[ include included.mash ]]]
-                bar()
+                foo()
             ]]]
         """
         root = tree_from_string(code, 'xyz.mash')
         root.execute()
 
+def test_mashlib_shell1():
+    # Shell commands run correctly.
+    code = """
+        [[[
+            [[[ include mashlib.mash ]]]
+            result = shell('ls /dev')
+            assert 'null' in result.stdout.decode('utf-8')
+        ]]]
+    """
+    root = tree_from_string(code, 'xyz.mash')
+    root.execute()
 
+def test_mashlib_shell2():
+    # Broken commands raise exceptions.
+    code = """
+        [[[
+            [[[ include mashlib.mash ]]]
+            result = shell('ls /foobar')
+        ]]]
+    """
+    root = tree_from_string(code, 'xyz.mash')
+    with pytest.raises(subprocess.CalledProcessError):
+        root.execute()
+
+def test_subprocess_error_report1():
+    # Exceptions from broken commands are caught and reported gracefully.
+    code = """
+        [[[
+            [[[ include mashlib.mash ]]]
+            result = shell('ls /foobar')
+        ]]]
+    """
+
+    with temporary_current_directory(['mashlib.mash']):
+        with open('test.mash', 'w', encoding='utf-8') as output_file:
+            print(code, file=output_file)
+
+        engage(['mash3', 'test.mash'])
 
 
 if __name__ == '__main__':  #pragma: nocover
