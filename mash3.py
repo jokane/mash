@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# pylint: disable=too-few-public-methods
+# pylint: disable=invalid-name
+# pylint: disable=exec-used
 
 """This is a tool that allows text in various languages to be stored together
 in a single input file. along with instructions for manipulating, mutating, and
@@ -131,7 +134,8 @@ class FrameTreeNode(ABC):
 
     def announce(self, variables):
         """Print some details about this node, to be called just before executing."""
-        if variables is None: variables = {}
+        if variables is None:
+            variables = {}
         print(f"Executing this {type(self)} with {len(variables)} variables:")
         print(self.as_indented_string(indent_level=1), end='')
         print()

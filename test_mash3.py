@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-# pylint: disable=missing-module-docstring
 # pylint: disable=missing-function-docstring
 # pylint: disable=wildcard-import
-# pylint: disable=too-many-lines
 # pylint: disable=unused-wildcard-import
 # pylint: disable=protected-access
+
+"""Tests for mash.  Usually run via the check script, but can be used from the
+command line as well to run single tests."""
+
 
 import contextlib
 import sys

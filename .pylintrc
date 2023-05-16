@@ -1,5 +1,0 @@
-[MESSAGES CONTROL]
-disable=trailing-newlines,unused-wildcard-import,invalid-name,multiple-statements,too-many-arguments,too-many-return-statements,no-else-return,eval-used,too-many-public-methods,unspecified-encoding,too-many-branches,too-many-locals,too-many-instance-attributes,too-few-public-methods,unnecessary-lambda-assignment,exec-used
-
-[TYPECHECK]
-generated-members=cv2.*
