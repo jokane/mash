@@ -9,7 +9,6 @@
 import contextlib
 import sys
 import tempfile
-import concurrent.futures
 import traceback
 
 import pytest
@@ -40,9 +39,6 @@ def temporary_current_directory():
                 yield
             finally:
                 pass
-
-def get_executor():
-    return concurrent.futures.ThreadPoolExecutor(max_workers=4)
 
 def test_unindent():
     code = "    print('hello')\n    print('world')"
@@ -108,48 +104,94 @@ def test_frame_stats():
 
 def test_codeleaf_execute1():
     # Somthing simple.
-    CodeLeaf(Address('xyz.mash', 1, 1), None, "print('hello')").execute(get_executor())
+    CodeLeaf(Address('xyz.mash', 1, 1), None, "print('hello')").execute({})
 
 def test_codeleaf_execute2():
     # Syntax error.
     with pytest.raises(SyntaxError):
-        CodeLeaf(Address('xyz.mash', 1, 1), None, "print 'hello'").execute(get_executor())
+        CodeLeaf(Address('xyz.mash', 1, 1), None, "print 'hello'").execute()
 
 def test_codeleaf_execute3():
     # Correct line number.
     with pytest.raises(Exception) as exc_info:
         CodeLeaf(Address('xyz.mash', 5, 1),
                  None,
-                 "  \n\n\n  raise ValueError('sadness')").execute(get_executor())
+                 "  \n\n\n  raise ValueError('sadness')").execute()
 
     formatted_tb = '\n'.join(traceback.format_tb(exc_info._excinfo[2]))
     assert '"xyz.mash", line 8' in formatted_tb
 
 def test_textleaf_execute1():
     # Simple.
-    TextLeaf(Address('xyz.mash', 1, 1), None, "print('hello')").execute(get_executor())
+    TextLeaf(Address('xyz.mash', 1, 1), None, "print('hello')").execute()
 
 def test_textleaf_execute2():
     # Text leaves don't execute their content as code -- no exception here.
-    TextLeaf(Address('xyz.mash', 1, 1), None, "print 'hello'").execute(get_executor())
+    TextLeaf(Address('xyz.mash', 1, 1), None, "print 'hello'").execute()
 
 def test_frame_execute():
     root = tree_from_string('A [[[ print("B") ]]] C', 'xyz.mash')
-    root.execute(get_executor())
+    root.execute()
 
 def test_frame_execute2():
     # Check recursive execution, normal case.
     root = tree_from_string('[[[ print("B") ||| [[[ print("C") ||| D ]]] ]]]', 'xyz.mash')
-    root.execute(get_executor())
+    root.execute()
 
 
 def test_frame_execute3():
     # Check recursive execution, failing.
     root = tree_from_string('[[[ print("B") ||| [[[ print C ||| D ]]] ]]]', 'xyz.mash')
     with pytest.raises(SyntaxError):
-        root.execute(get_executor())
+        root.execute()
 
+def test_vars1():
+    # Variables from child frames are visible to parents.
+    code = """
+        [[[
+            print(x)
+            [[[ x = 3 ]]]
+        ]]]
+    """
+    root = tree_from_string(code, 'xyz.mash')
+    root.execute()
 
+def test_vars2():
+    # Vars from later children replace vars from earlier children.
+    code = """
+        [[[
+            [[[
+                import time
+                time.sleep(0.5)
+                x = 3
+            ]]]
+            [[[
+                x = 4
+            ]]]
+        ]]]
+    """
+    root = tree_from_string(code, 'xyz.mash')
+    _, variables = root.execute()
+
+    assert 'x' in variables
+    assert variables['x'] == 4
+
+def test_vars3():
+    # Changes in sibling frames don't affect each other.
+    code = """
+        [[[
+            x = 3
+        ]]]
+
+        [[[
+            import time
+            time.sleep(0.5)
+            x
+        ]]]
+    """
+    root = tree_from_string(code, 'xyz.mash')
+    with pytest.raises(NameError):
+        root.execute()
 
 
 # If we're run as a script, just execute all of the tests.  Or, if a

@@ -35,6 +35,7 @@ import re
 import shutil
 import sys
 import time
+import copy
 
 from abc import ABC, abstractmethod
 
@@ -115,7 +116,7 @@ class FrameTreeNode(ABC):
         self.parent = parent
 
     @abstractmethod
-    def execute(self, executor):
+    def execute(self, variables=None):
         """Do the work represented by this node, if any.  Return a list of
         objects that should replace this one in the tree."""
 
@@ -127,6 +128,14 @@ class FrameTreeNode(ABC):
     @abstractmethod
     def stats(self):
         """Return a Stats object for this node and its descendants."""
+
+    def announce(self, variables):
+        """Print some details about this node, to be called just before executing."""
+        if variables is None: variables = {}
+        print(f"Executing this {type(self)} with {len(variables)} variables:")
+        print(self.as_indented_string(indent_level=1), end='')
+        print()
+
 
 class Frame(FrameTreeNode):
     """A frame represents a block containing some text along with code that
@@ -144,43 +153,62 @@ class Frame(FrameTreeNode):
         r += ('  '*indent_level) + ']]]\n'
         return r
 
-    def execute(self, executor):
+    def execute(self, variables=None):
         """Do the work for this frame.  Run each of the children, pull their
-        results, and then run any code elements here.  Use the given executor
-        to manage any parallel tasks."""
-        print("Executing this frame:")
-        print(self.as_indented_string())
+        results, and then run any code elements here."""
+        self.announce(variables)
 
-        # A helper for executing things and waiting for them to finish.
-        def execute_children(executor, frames_only):
-            """Allow each child in the given list to execute in parallel.  Wait for
-            all of them to finish."""
-            futures = []
-            for child in self.children:
-                if frames_only and not isinstance(child, Frame):
-                    future = [ child ]
-                else:
-                    future = executor.submit(child.execute, executor)
-                futures.append(future)
+        if variables is None:
+            variables = {}
 
-            new_children = []
-            for future in futures:
-                if isinstance(future, list):
-                    new_children += future
-                else:
-                    new_children += future.result()
-            self.children = new_children
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            # Execute all of the child frames.
+            self.execute_children(executor, variables, True)
 
-        # Execute all of the child frames.
-        child_frames = [ child for child in self.children if isinstance(child, Frame)]
-        execute_children(executor, child_frames)
+            # Child frames are done.  Our child list should now be just leaves.
+            # Execute each of them.
+            self.execute_children(executor, variables, False)
 
-        # Child frames are done.  Our child list should now be just leaves.
-        # Execute each of them.
-        execute_children(executor, self.children)
+        # You might hink that it would be better to have a single executor
+        # that handles the entire build, with each node that needs to start a
+        # job subitting things and waiting for the response.  If you thought
+        # that, enjoy the inevitable deadlocks!
+        #
+        # The problem with that approach is that there is a limited number of
+        # threads provided by an executor, some which are occupied by the
+        # frames that are waiting for children.  But those child tasks may
+        # never get assigned to a thread because all the threads are used up by
+        # parents waiting for results.
+        #
+        # Thus, a separate executor for each frame.
 
         # All done.
-        return self.children
+        return (self.children, variables)
+
+    def execute_children(self, executor, variables, frames_only):
+        """Allow each child to execute in parallel.  Wait for all of them to
+        finish.  Replace each child with the replacements that it returns."""
+        things = []
+        original_children = {}
+        for child in self.children:
+            if frames_only and not isinstance(child, Frame):
+                thing = child
+            else:
+                child_variables = copy.copy(variables)
+                thing = executor.submit(child.execute, child_variables)
+                original_children[thing] = child
+            things.append(thing)
+
+        new_children = []
+        for thing in things:
+            if isinstance(thing, FrameTreeNode):
+                new_children.append(thing)
+            else:
+                child_result, child_variables = thing.result()
+                variables |= child_variables
+                new_children += child_result
+
+        self.children = new_children
 
     def stats(self):
         return sum([child.stats() for child in self.children], start=Stats(1, 0, 0))
@@ -200,10 +228,9 @@ class FrameTreeLeaf(FrameTreeNode):
 
 class CodeLeaf(FrameTreeLeaf):
     """A leaf node representing Python code to be executed."""
-    def execute(self, executor):
+    def execute(self, variables=None):
         """ Execute our text as Python code."""
-        print("Executing this code leaf:")
-        print(self.as_indented_string())
+        self.announce(variables)
 
         # Fix the indentation.
         source = unindent(self.content)
@@ -214,9 +241,9 @@ class CodeLeaf(FrameTreeLeaf):
 
         # Run the stuff.
         code_obj = compile(source, self.address.filename, 'exec')
-        exec(code_obj, {}, {})
+        exec(code_obj, variables, variables)
 
-        return [ TextLeaf(self.address, self.parent, ''), ]
+        return ([ TextLeaf(self.address, self.parent, ''), ], variables)
 
     def line_marker(self):
         return '*'
@@ -227,11 +254,9 @@ class CodeLeaf(FrameTreeLeaf):
 class TextLeaf(FrameTreeLeaf):
     """A leaf node representing just text."""
 
-    def execute(self, executor):
+    def execute(self, variables=None):
         """ Nothing to do here."""
-        print("Executing this text leaf:")
-        print(self.as_indented_string())
-        return [ self, ]
+        return ([ self ], variables)
 
     def line_marker(self):
         return '.'
@@ -397,8 +422,7 @@ def engage(argv):
 
     root = tree_from_string(text, input_filename)
 
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
-    root.execute(executor)
+    root.execute()
 
     end_time = time.time()
     elapsed = f'{end_time-start_time:.02f}'
