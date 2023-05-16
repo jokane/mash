@@ -160,7 +160,6 @@ def test_vars2():
     # Vars from later children replace vars from earlier children.
     code = """
         [[[
-<<<<<<< HEAD
             [[[
                 import time
                 time.sleep(0.5)
@@ -169,11 +168,6 @@ def test_vars2():
             [[[
                 x = 4
             ]]]
-=======
-            assert x == 4 
-            [[[ x = 3 ]]]
-            [[[ x = 4 ]]]
->>>>>>> a6ab271913144f744797b4222e6c0c0b21c52bf4
         ]]]
     """
     root = tree_from_string(code, 'xyz.mash')
