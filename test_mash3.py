@@ -42,6 +42,24 @@ def temporary_current_directory():
             finally:
                 pass
 
+def run_tests_from_pattern(): #pragma nocover
+    # If we're run as a script, just execute all of the tests.  Or, if a
+    # command line argument is given, execute only the tests containing that
+    # pattern.
+    pattern = ''
+    try:
+        pattern = sys.argv[1]
+    except IndexError:
+        pass
+
+    for name, thing in list(globals().items()):
+        if 'test_' in name and pattern in name:
+            print('-'*80)
+            print(name)
+            print('-'*80)
+            thing()
+            print()
+
 def test_unindent():
     code = "    print('hello')\n    print('world')"
     assert len(code) - len(unindent(code)) == 8
@@ -228,25 +246,23 @@ def test_restart_request2():
         assert os.path.exists('2')
 
 
+def test_include():
+    # Included files are found and imported.
+    with temporary_current_directory():
+        with open('included.mash', 'w', encoding='utf-8') as output_file:
+            print('[[[ def foo(x):\n    return "bar"]]]',
+                  file=output_file)
+        code = """
+            [[[
+                [[[ include included.mash ]]]
+                bar()
+            ]]]
+        """
+        root = tree_from_string(code, 'xyz.mash')
+        root.execute()
 
-# If we're run as a script, just execute all of the tests.  Or, if a
-# command line argument is given, execute only the tests containing
-# that pattern.
 
-def run_tests_from_pattern(): #pragma nocover
-    pattern = ''
-    try:
-        pattern = sys.argv[1]
-    except IndexError:
-        pass
 
-    for name, thing in list(globals().items()):
-        if 'test_' in name and pattern in name:
-            print('-'*80)
-            print(name)
-            print('-'*80)
-            thing()
-            print()
 
 if __name__ == '__main__':  #pragma: nocover
     run_tests_from_pattern()

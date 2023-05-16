@@ -46,6 +46,7 @@ class RestartRequest (Exception):
     """ A special exception to be raised when some part of the code wants to
     start the entire process over. """
 
+
 class Token(enum.Enum):
     """A token that represents a bit of mash syntax."""
     OPEN = 2
@@ -119,7 +120,8 @@ class FrameTreeNode(ABC):
     @abstractmethod
     def execute(self, variables=None):
         """Do the work represented by this node, if any.  Return a list of
-        objects that should replace this one in the tree."""
+        objects that should replace this one in the tree and a (possibly
+        updated) variables dictionary."""
 
     @abstractmethod
     def as_indented_string(self, indent_level=0):
@@ -219,7 +221,7 @@ class Frame(FrameTreeNode):
         return sum([child.stats() for child in self.children], start=Stats(1, 0, 0))
 
 class FrameTreeLeaf(FrameTreeNode):
-    """A leaf node.  Base class for CodeLeaf and TextLeaf."""
+    """A leaf node.  Base class for CodeLeaf, TextLeaf, and IncludeLeaf."""
     def __init__(self, address, parent, content):
         super().__init__(address, parent)
         self.content = content
@@ -268,6 +270,30 @@ class TextLeaf(FrameTreeLeaf):
 
     def stats(self):
         return Stats(0, 0, 1)
+
+class IncludeLeaf(FrameTreeLeaf):
+    """A leaf node representing the inclusion of another mash file."""
+    def execute(self, variables=None):
+        """Load the file and execute it."""
+        self.announce(variables)
+
+        with open(self.content, 'r', encoding='utf-8') as input_file:
+            text = input_file.read()
+
+        root = tree_from_string(text, self.content)
+
+        if root is None:
+            print(f'[{self.content}: nothing there]')
+            return [], variables
+
+        result, variables = root.execute()
+        return result, variables
+
+    def line_marker(self):
+        return '#'
+
+    def stats(self):
+        return Stats(0, 0, 0)
 
 def unindent(s):
     """Given a string, modify each line by removing the whitespace that appears
@@ -403,10 +429,8 @@ def tree_from_element_seq(seq):
 
     return frame
 
-
 def engage(argv):
     """ Actually do things, based on what the command line asked for. """
-
     start_time = time.time()
 
     if '-c' in argv:
@@ -424,21 +448,11 @@ def engage(argv):
     else:
         input_filename = argv[1]
 
-    with open(input_filename, 'r', encoding='utf-8') as input_file:
-        text = input_file.read()
-
-    root = tree_from_string(text, input_filename)
-
-    if root is None:
-        print('Input seems to be empty.')
-        return
-
-    root.execute()
+    _, stats = IncludeLeaf(Address(input_filename, 1, 1), None, input_filename).execute()
 
     end_time = time.time()
     elapsed = f'{end_time-start_time:.02f}'
 
-    stats = root.stats()
     print(f"{stats}; {elapsed} seconds")
 
 def main(argv):
