@@ -53,9 +53,7 @@ class Token(enum.Enum):
     CLOSE = 4
     NEWLINE = 5
     def __lt__(self, other):
-        if self.__class__ is other.__class__:
-            return self.value < other.value
-        return NotImplemented  #pragma nocover
+        return self.value < other.value
 
 class Address:
     """A location in some file."""
