@@ -195,6 +195,34 @@ def test_vars3():
     with pytest.raises(NameError):
         root.execute()
 
+def test_restart_request1():
+    # RestartRequest is visible from mash code.
+    code = """
+        [[[
+            raise RestartRequest
+        ]]]
+    """
+    with pytest.raises(RestartRequest):
+        tree_from_string(code, '').execute()
+
+def test_restart_request2():
+    # RestartRequests are correctly handled in main()
+    with temporary_current_directory():
+        code = """
+            [[[
+                import os
+                if not os.path.exists('1'):
+                    os.system('touch 1')
+                    raise RestartRequest
+                else:
+                    os.system('touch 2')
+            ]]]
+        """
+        with open('test.mash', 'w', encoding='utf-8') as output_file:
+            print(code, file=output_file)
+        main(['mash3', 'test.mash'])
+        assert os.path.exists('1')
+        assert os.path.exists('2')
 
 # If we're run as a script, just execute all of the tests.  Or, if a
 # command line argument is given, execute only the tests containing

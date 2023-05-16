@@ -135,11 +135,16 @@ class FrameTreeNode(ABC):
     def announce(self, variables):
         """Print some details about this node, to be called just before executing."""
         if variables is None:
-            variables = {}
+            variables = self.default_variables()
         print(f"Executing this {type(self)} with {len(variables)} variables:")
         print(self.as_indented_string(indent_level=1), end='')
         print()
 
+    def default_variables(self):
+        """Return a dictionary to use as the variables in cases where no
+        variables dict has been established yet."""
+        return {'RestartRequest': RestartRequest,
+                'self': self }
 
 class Frame(FrameTreeNode):
     """A frame represents a block containing some text along with code that
@@ -163,7 +168,7 @@ class Frame(FrameTreeNode):
         self.announce(variables)
 
         if variables is None:
-            variables = {}
+            variables = self.default_variables()
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             # Execute all of the child frames.
@@ -193,14 +198,12 @@ class Frame(FrameTreeNode):
         """Allow each child to execute in parallel.  Wait for all of them to
         finish.  Replace each child with the replacements that it returns."""
         things = []
-        original_children = {}
         for child in self.children:
             if frames_only and not isinstance(child, Frame):
                 thing = child
             else:
                 child_variables = copy.copy(variables)
                 thing = executor.submit(child.execute, child_variables)
-                original_children[thing] = child
             things.append(thing)
 
         new_children = []
@@ -228,7 +231,7 @@ class FrameTreeLeaf(FrameTreeNode):
         """A short string to mark what kind of leaf this is."""
 
     def as_indented_string(self, indent_level=0):
-        return ('  '*indent_level) + f'{self.line_marker()} {self.content.__repr__()}\n'
+        return ('  '*indent_level) + f'{self.line_marker()} {self.content.strip().__repr__()}\n'
 
 class CodeLeaf(FrameTreeLeaf):
     """A leaf node representing Python code to be executed."""
@@ -401,6 +404,7 @@ def tree_from_element_seq(seq):
 
     return frame
 
+
 def engage(argv):
     """ Actually do things, based on what the command line asked for. """
 
@@ -434,18 +438,18 @@ def engage(argv):
     stats = root.stats()
     print(f"{stats}; {elapsed} seconds")
 
-def main(): # pragma no cover
+def main(argv):
     """ Main entry point.  Mostly just logic to respond to restart requests. """
     done = False
     original_cwd = os.getcwd()
     while not done:
         os.chdir(original_cwd)
         try:
-            engage(sys.argv)
+            engage(argv)
             done = True
         except RestartRequest:
             pass
 
 
 if __name__ == '__main__': # pragma no cover
-    main()
+    main(sys.argv)
