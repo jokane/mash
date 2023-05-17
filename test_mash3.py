@@ -65,6 +65,7 @@ def run_tests_from_pattern(): #pragma nocover
             print('-'*80)
             thing()
             print()
+################################################################################
 
 def test_unindent():
     code = "    print('hello')\n    print('world')"
@@ -145,41 +146,42 @@ def test_codeleaf_execute1():
 def test_codeleaf_execute2():
     # Syntax error.
     with pytest.raises(SyntaxError):
-        CodeLeaf(Address('xyz.mash', 1, 1), None, "print 'hello'").execute()
+        CodeLeaf(Address('xyz.mash', 1, 1), None, "print 'hello'").execute({})
 
 def test_codeleaf_execute3():
     # Correct line number.
     with pytest.raises(Exception) as exc_info:
         CodeLeaf(Address('xyz.mash', 5, 1),
                  None,
-                 "  \n\n\n  raise ValueError('sadness')").execute()
+                 "  \n\n\n  raise ValueError('sadness')").execute({})
 
     formatted_tb = '\n'.join(traceback.format_tb(exc_info._excinfo[2]))
     assert '"xyz.mash", line 8' in formatted_tb
 
 def test_textleaf_execute1():
     # Simple.
-    TextLeaf(Address('xyz.mash', 1, 1), None, "print('hello')").execute()
+    TextLeaf(Address('xyz.mash', 1, 1), None, "print('hello')").execute({})
 
 def test_textleaf_execute2():
     # Text leaves don't execute their content as code -- no exception here.
-    TextLeaf(Address('xyz.mash', 1, 1), None, "print 'hello'").execute()
+    TextLeaf(Address('xyz.mash', 1, 1), None, "print 'hello'").execute({})
 
 def test_frame_execute():
+    # Something simple.
     root = tree_from_string('A [[[ print("B") ]]] C', 'xyz.mash')
-    root.execute()
+    root.execute({})
 
 def test_frame_execute2():
     # Check recursive execution, normal case.
     root = tree_from_string('[[[ print("B") ||| [[[ print("C") ||| D ]]] ]]]', 'xyz.mash')
-    root.execute()
+    root.execute({})
 
 
 def test_frame_execute3():
     # Check recursive execution, failing.
     root = tree_from_string('[[[ print("B") ||| [[[ print C ||| D ]]] ]]]', 'xyz.mash')
     with pytest.raises(SyntaxError):
-        root.execute()
+        root.execute({})
 
 def test_vars1():
     # Variables from child frames are visible to parents.
@@ -190,7 +192,7 @@ def test_vars1():
         ]]]
     """
     root = tree_from_string(code, 'xyz.mash')
-    root.execute()
+    root.execute({})
 
 def test_vars2():
     # Vars from later children replace vars from earlier children.
@@ -206,28 +208,12 @@ def test_vars2():
             ]]]
         ]]]
     """
+    variables = {}
     root = tree_from_string(code, 'xyz.mash')
-    _, variables = root.execute()
+    root.execute(variables)
 
     assert 'x' in variables
     assert variables['x'] == 4
-
-def test_vars3():
-    # Changes in sibling frames don't affect each other.
-    code = """
-        [[[
-            x = 3
-        ]]]
-
-        [[[
-            import time
-            time.sleep(0.5)
-            x
-        ]]]
-    """
-    root = tree_from_string(code, 'xyz.mash')
-    with pytest.raises(NameError):
-        root.execute()
 
 def test_restart_request1():
     # RestartRequest is visible from mash code.
@@ -237,7 +223,7 @@ def test_restart_request1():
         ]]]
     """
     with pytest.raises(RestartRequest):
-        tree_from_string(code, '').execute()
+        tree_from_string(code, '').execute(default_variables())
 
 def test_restart_request2():
     # RestartRequests are correctly handled in main()
@@ -272,7 +258,7 @@ def test_include():
             ]]]
         """
         root = tree_from_string(code, 'xyz.mash')
-        root.execute()
+        root.execute({})
 
 def test_mashlib_shell1():
     # Shell commands run correctly.
@@ -284,7 +270,7 @@ def test_mashlib_shell1():
         ]]]
     """
     root = tree_from_string(code, 'xyz.mash')
-    root.execute()
+    root.execute({})
 
 def test_mashlib_shell2():
     # Broken commands raise exceptions.
@@ -296,7 +282,7 @@ def test_mashlib_shell2():
     """
     root = tree_from_string(code, 'xyz.mash')
     with pytest.raises(subprocess.CalledProcessError):
-        root.execute()
+        root.execute({})
 
 def test_subprocess_error_report1():
     # Exceptions from broken commands are caught and reported gracefully.
@@ -313,6 +299,37 @@ def test_subprocess_error_report1():
 
         engage(['mash3', 'test.mash'])
 
+def test_subprocess_max_jobs():
+    # The max_jobs setting actually limits the number of parallel shell jobs
+    # running at a time.
+    code = """
+        [[[
+            [[[ include mashlib.mash ]]]
+            max_jobs = 2
+            [[[ shell('echo 10 >> nums; sleep 0.1; echo 11 >> nums; sleep 0.1') ]]]
+            [[[ shell('echo 20 >> nums; sleep 0.1; echo 21 >> nums; sleep 0.1') ]]]
+            [[[ shell('echo 30 >> nums; sleep 0.1; echo 31 >> nums; sleep 0.1') ]]]
+        ]]]
+    """
+    root = tree_from_string(code, "xyz.mash")
+
+    with temporary_current_directory(['mashlib.mash']):
+        root.execute(default_variables())
+
+        with open('nums', encoding='utf-8') as numbers_file:
+            numbers = numbers_file.read()
+
+    numbers = list(map(int, numbers.strip().split('\n')))
+    print(numbers)
+
+    # 20 before 11, to show that the second jobs starts in parallel with the
+    # first one.
+    assert numbers.index(20) < numbers.index(11)
+
+    # (30 after 11) or (30 after 21), to show that the third job waits
+    # until either of the first two are done.
+    assert (numbers.index(30) > numbers.index(11)) or \
+        (numbers.index(30) > numbers.index(21))
 
 if __name__ == '__main__':  #pragma: nocover
     run_tests_from_pattern()

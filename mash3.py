@@ -31,7 +31,6 @@ storing that text."""
 #   2019-04-02: Starting major rewrite, replacing custom language with Python.
 #   2022-11-17: Starting second major overall, to allow parallel execution.
 
-import concurrent.futures
 import enum
 import heapq
 import os
@@ -40,7 +39,6 @@ import shutil
 import subprocess
 import sys
 import time
-import copy
 
 from abc import ABC, abstractmethod
 
@@ -120,10 +118,9 @@ class FrameTreeNode(ABC):
         self.parent = parent
 
     @abstractmethod
-    def execute(self, variables=None):
+    def execute(self, variables):
         """Do the work represented by this node, if any.  Return a list of
-        objects that should replace this one in the tree and a (possibly
-        updated) variables dictionary."""
+        objects that should replace this one in the tree."""
 
     @abstractmethod
     def as_indented_string(self, indent_level=0):
@@ -143,11 +140,10 @@ class FrameTreeNode(ABC):
         # print(self.as_indented_string(indent_level=1), end='')
         # print()
 
-    def default_variables(self):
-        """Return a dictionary to use as the variables in cases where no
-        variables dict has been established yet."""
-        return {'RestartRequest': RestartRequest,
-                'self': self }
+def default_variables():
+    """Return a dictionary to use as the variables in cases where no
+    variables dict has been established yet."""
+    return {'RestartRequest': RestartRequest,}
 
 class Frame(FrameTreeNode):
     """A frame represents a block containing some text along with code that
@@ -165,57 +161,30 @@ class Frame(FrameTreeNode):
         r += ('  '*indent_level) + ']]]\n'
         return r
 
-    def execute(self, variables=None):
+    def execute(self, variables):
         """Do the work for this frame.  Run each of the children, pull their
         results, and then run any code elements here."""
         self.announce(variables)
 
-        if variables is None:
-            variables = self.default_variables()
+        # Execute all of the child frames.
+        self.execute_children(variables, True)
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            # Execute all of the child frames.
-            self.execute_children(executor, variables, True)
-
-            # Child frames are done.  Our child list should now be just leaves.
-            # Execute each of them.
-            self.execute_children(executor, variables, False)
-
-        # You might hink that it would be better to have a single executor
-        # that handles the entire build, with each node that needs to start a
-        # job subitting things and waiting for the response.  If you thought
-        # that, enjoy the inevitable deadlocks!
-        #
-        # The problem with that approach is that there is a limited number of
-        # threads provided by an executor, some which are occupied by the
-        # frames that are waiting for children.  But those child tasks may
-        # never get assigned to a thread because all the threads are used up by
-        # parents waiting for results.
-        #
-        # Thus, a separate executor for each frame.
+        # Child frames are done.  Our child list should now be just leaves.
+        # Execute each of them.
+        self.execute_children(variables, False)
 
         # All done.
-        return (self.children, variables)
+        return self.children
 
-    def execute_children(self, executor, variables, frames_only):
+    def execute_children(self, variables, frames_only):
         """Allow each child to execute in parallel.  Wait for all of them to
         finish.  Replace each child with the replacements that it returns."""
-        things = []
+        new_children = []
         for child in self.children:
             if frames_only and not isinstance(child, Frame):
-                thing = child
+                new_children.append(child)
             else:
-                child_variables = copy.copy(variables)
-                thing = executor.submit(child.execute, child_variables)
-            things.append(thing)
-
-        new_children = []
-        for thing in things:
-            if isinstance(thing, FrameTreeNode):
-                new_children.append(thing)
-            else:
-                child_result, child_variables = thing.result()
-                variables |= child_variables
+                child_result = child.execute(variables)
                 new_children += child_result
 
         self.children = new_children
@@ -238,7 +207,7 @@ class FrameTreeLeaf(FrameTreeNode):
 
 class CodeLeaf(FrameTreeLeaf):
     """A leaf node representing Python code to be executed."""
-    def execute(self, variables=None):
+    def execute(self, variables):
         """ Execute our text as Python code."""
         self.announce(variables)
 
@@ -253,7 +222,7 @@ class CodeLeaf(FrameTreeLeaf):
         code_obj = compile(source, self.address.filename, 'exec')
         exec(code_obj, variables, variables)
 
-        return ([ TextLeaf(self.address, self.parent, ''), ], variables)
+        return [ TextLeaf(self.address, self.parent, '') ]
 
     def line_marker(self):
         return '*'
@@ -264,9 +233,9 @@ class CodeLeaf(FrameTreeLeaf):
 class TextLeaf(FrameTreeLeaf):
     """A leaf node representing just text."""
 
-    def execute(self, variables=None):
+    def execute(self, variables):
         """ Nothing to do here."""
-        return ([ self ], variables)
+        return [ self ]
 
     def line_marker(self):
         return '.'
@@ -276,7 +245,7 @@ class TextLeaf(FrameTreeLeaf):
 
 class IncludeLeaf(FrameTreeLeaf):
     """A leaf node representing the inclusion of another mash file."""
-    def execute(self, variables=None):
+    def execute(self, variables):
         """Load the file and execute it."""
         self.announce(variables)
 
@@ -287,10 +256,11 @@ class IncludeLeaf(FrameTreeLeaf):
 
         if root is None:
             print(f'[{self.content}: nothing there]')
-            return [], variables
+            return []
 
-        result, variables = root.execute()
-        return result, variables
+        result = root.execute(variables)
+
+        return result
 
     def line_marker(self):
         return '#'
@@ -367,7 +337,6 @@ def element_seq_from_string(text, source_name, start_line=1):
         elif len(text_so_far) > 0:
             yield Element(Address(source_name, line, 0), text_so_far)
             text_so_far = ''
-
 
         # Emit this token and move forward in the text.  Except if we have a
         # negative start value, which is a special case set by the
@@ -456,7 +425,8 @@ def engage(argv):
         input_filename = argv[1]
 
     try:
-        result, _ = IncludeLeaf(Address(input_filename, 1, 1), None, input_filename).execute()
+        leaf = IncludeLeaf(Address(input_filename, 1, 1), None, input_filename)
+        result = leaf.execute(default_variables())
     except subprocess.CalledProcessError as e:
         print(e)
         print(e.stdout.decode("utf-8", errors='ignore'))
@@ -467,6 +437,7 @@ def engage(argv):
     elapsed = f'{end_time-start_time:.02f}'
 
     if len(result) > 0:
+        print(result)
         stats = result[0].stats()
         print(f"{stats}; {elapsed} seconds")
 
