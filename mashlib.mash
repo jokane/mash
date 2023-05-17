@@ -5,6 +5,8 @@ import concurrent.futures
 import shutil
 import resource
 import subprocess
+import os
+from exceptiongroup import ExceptionGroup
 
 # A library of "standard" functions that provide many of the basic operations
 # that one might want to do on a mash frame.  Most mash documents will include
@@ -22,14 +24,16 @@ if not mashlib_initialized:
     # A list of executable names whose existence we have already verified.
     executables_checked = set()
 
-    # A limit on the number of parallel shell jobs to run at a time.  Use None
-    # for the Python default, something like os.cpu_count()+4.
-    max_shell_jobs = None
+    # A limit on the number of parallel jobs to run at a time.
+    max_jobs = os.cpu_count() + 4
 
-    # The manager for the thread pool that handles shell jobs.  Created on the
-    # first call to shell(), rather than here, to give the client code time to
-    # change max_shell_jobs.
-    shell_executor = None
+    # The manager for the thread pool that handles expensive jobs, mostly from
+    # shell().  Created on the first call that needs it, rather than here, to
+    # give the client code time to change max_jobs.
+    job_executor = None
+
+    # A list of futures for jobs that have been submitted.
+    job_futures = []
 
 
 def check_for_executable(exe):
@@ -42,16 +46,16 @@ def check_for_executable(exe):
     executables_checked.add(exe)
 
 def shell(command, stdin=None, check=True):
-    """Execute the given command in a shell.  Raise subprocess.CalledProcessError
-    if the command gives a non-zero return code.  Return the CompletedProcess
-    object, which has stdout and stderr attributes.  In addition, this object
-    has attributes tacked on to it showing the user time and system time
-    consumed, as reported by getrusage."""
-    global shell_executor
+    """Execute the given command in a shell.  Raise
+    subprocess.CalledProcessError if the command gives a non-zero return code.
+    Return the CompletedProcess object, which has stdout and stderr attributes.
+    In addition, this object has attributes tacked on to it showing the user
+    time and system time consumed, as reported by getrusage."""
+    global job_executor
     
-    if shell_executor is None:
-        print(f"Starting shell executor with a maximum of {max_shell_jobs} jobs.")
-        shell_executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_shell_jobs)
+    if job_executor is None:
+        print(f"Starting job executor with a maximum of {max_jobs} jobs.")
+        job_executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_jobs)
 
     if check:
         check_for_executable(command.split(' ')[0])
@@ -61,15 +65,35 @@ def shell(command, stdin=None, check=True):
     def run_job():
         usage_before = resource.getrusage(resource.RUSAGE_CHILDREN)
 
-        completed_process = subprocess.run(command, shell=True, check=True, input=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60000)
-        
+        completed_process = subprocess.run(command,
+                                           shell=True,
+                                           check=True,
+                                           input=stdin,
+                                           stdout=subprocess.PIPE,
+                                           stderr=subprocess.PIPE,
+                                           timeout=60000)
         usage_after = resource.getrusage(resource.RUSAGE_CHILDREN)
         completed_process.user_time = usage_after.ru_utime - usage_before.ru_utime
         completed_process.sys_time = usage_after.ru_stime - usage_before.ru_stime
         
         return completed_process
 
-    future = shell_executor.submit(run_job)
-    return future.result()
+    future = job_executor.submit(run_job)
+    job_futures.append(future)
+
+def at_end():
+    # Finish up any jobs that are still running.  Report any exceptions that
+    # occured.
+    exceptions = []
+    for future in job_futures:
+        try:
+            future.result()
+        except Exception as exception:
+            exceptions.append(exception)
+
+    if len(exceptions) == 1:
+        raise exceptions[0]
+    elif len(exceptions) > 1:
+        raise ExceptionGroup("multiple failed jobs", exceptions)
 
 ]]]

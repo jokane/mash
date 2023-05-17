@@ -265,12 +265,13 @@ def test_mashlib_shell1():
     code = """
         [[[
             [[[ include mashlib.mash ]]]
-            result = shell('ls /dev')
-            assert 'null' in result.stdout.decode('utf-8')
+            shell('ls /dev')
         ]]]
     """
     root = tree_from_string(code, 'xyz.mash')
-    root.execute({})
+    variables = {}
+    root.execute(variables)
+    variables['at_end']()
 
 def test_mashlib_shell2():
     # Broken commands raise exceptions.
@@ -281,8 +282,10 @@ def test_mashlib_shell2():
         ]]]
     """
     root = tree_from_string(code, 'xyz.mash')
+    variables = {}
+    root.execute(variables)
     with pytest.raises(subprocess.CalledProcessError):
-        root.execute({})
+        variables['at_end']()
 
 def test_subprocess_error_report1():
     # Exceptions from broken commands are caught and reported gracefully.
@@ -306,23 +309,24 @@ def test_subprocess_max_jobs():
         [[[
             [[[ include mashlib.mash ]]]
             max_jobs = 2
-            [[[ shell('echo 10 >> nums; sleep 0.1; echo 11 >> nums; sleep 0.1') ]]]
-            [[[ shell('echo 20 >> nums; sleep 0.1; echo 21 >> nums; sleep 0.1') ]]]
-            [[[ shell('echo 30 >> nums; sleep 0.1; echo 31 >> nums; sleep 0.1') ]]]
+            shell('echo 10 >> nums; sleep 0.1; echo 11 >> nums; sleep 0.1')
+            shell('echo 20 >> nums; sleep 0.1; echo 21 >> nums; sleep 0.1')
+            shell('echo 30 >> nums; sleep 0.1; echo 31 >> nums; sleep 0.1')
         ]]]
     """
     root = tree_from_string(code, "xyz.mash")
 
     with temporary_current_directory(['mashlib.mash']):
-        root.execute(default_variables())
-
+        variables = default_variables()
+        root.execute(variables)
+        variables['at_end']()
         with open('nums', encoding='utf-8') as numbers_file:
             numbers = numbers_file.read()
 
     numbers = list(map(int, numbers.strip().split('\n')))
     print(numbers)
 
-    # 20 before 11, to show that the second jobs starts in parallel with the
+    # 20 before 11, to show that the second job runs in parallel with the
     # first one.
     assert numbers.index(20) < numbers.index(11)
 
@@ -330,6 +334,21 @@ def test_subprocess_max_jobs():
     # until either of the first two are done.
     assert (numbers.index(30) > numbers.index(11)) or \
         (numbers.index(30) > numbers.index(21))
+
+def test_at_end():
+    # Call to at_end() after full tree is executed.
+    with temporary_current_directory():
+        code = """
+            [[[
+                def at_end():
+                    raise ValueError
+            ]]]
+        """
+        with open('test.mash', 'w', encoding='utf-8') as output_file:
+            print(code, file=output_file)
+
+        with pytest.raises(ValueError):
+            engage(['mash3', 'test.mash'])
 
 if __name__ == '__main__':  #pragma: nocover
     run_tests_from_pattern()

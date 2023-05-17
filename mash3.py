@@ -425,8 +425,12 @@ def engage(argv):
         input_filename = argv[1]
 
     try:
+        variables = default_variables()
         leaf = IncludeLeaf(Address(input_filename, 1, 1), None, input_filename)
-        result = leaf.execute(default_variables())
+        result = leaf.execute(variables)
+        if 'at_end' in variables:
+            variables['at_end']()
+
     except subprocess.CalledProcessError as e:
         print(e)
         print(e.stdout.decode("utf-8", errors='ignore'))
