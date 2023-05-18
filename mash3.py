@@ -66,7 +66,7 @@ class Address:
         self.offset = offset
 
     def __str__(self):
-        return f'({self.filename}, line {self.lineno}, pos {self.offset})'
+        return f'({self.filename}, line {self.lineno}, offset {self.offset})'
 
     def exception(self, message):
         """Something went wrong at this address.  Complain, mentioning the
@@ -289,25 +289,22 @@ def unindent(s):
 def tree_from_string(text, source_name, start_line=1):
     """Given a string, parse the string as a mash document.  Return the root frame."""
     seq = element_seq_from_string(text, source_name, start_line)
-    root = tree_from_element_seq(seq)
+    compressed_seq = compress_element_seq(seq)
+    root = tree_from_element_seq(compressed_seq)
     return root
 
-def element_seq_from_string(text, source_name, start_line=1):
-    """Given a string, return a sequence of elements present in that string."""
+def token_seq_from_string(text):
+    """Given a string, return a sequence of strings and tokens present in that
+    string."""
     # Regex patterns of things we are looking for.
     patterns = [(Token.OPEN, r'\[\[\['),
                 (Token.SEPARATOR,  r'\|\|\|'),
                 (Token.CLOSE,  r'\]\]\]'),
                 (Token.NEWLINE, '\n'),
-                (Token.EOF, '$'),
                 ]
 
     # Pointer to the current location in the text.
     index = 0
-
-    # Which line are we on?  Minus one because the loop below has a dummy
-    # iteration to search for the first newline.
-    line = start_line - 1
 
     # Form a priority queue of tokens that we've found in the text.  Each one
     # refers to the next instance of each type of token that appears.  Start
@@ -321,9 +318,6 @@ def element_seq_from_string(text, source_name, start_line=1):
         priority_queue.append((start, token_type, regex, match))
     heapq.heapify(priority_queue)
 
-    text_so_far = ''
-    element_start_line = line
-
     # Keep emitting elements until we run out of them.
     while priority_queue:
         # Which token is next?
@@ -331,21 +325,7 @@ def element_seq_from_string(text, source_name, start_line=1):
 
         # If there's any text before this token, keep track of it.
         if start > index:
-            text_so_far += text[index:start]
-
-        # Is it a newline?
-        # - If so, update the line number, but also include it in the actual
-        # text.
-        # - If not, then the text element we (may) have been assembling is
-        # complete.
-        if token_type == Token.NEWLINE:
-            line += 1
-            text_so_far += '\n'
-        elif len(text_so_far) > 0:
-            if len(text_so_far.strip()) > 0:
-                yield Element(Address(source_name, element_start_line, 0), text_so_far)
-            text_so_far = ''
-            element_start_line = line
+            yield text[index:start]
 
         # Emit this token and move forward in the text.  Except if we have a
         # negative start value, which is a special case set by the
@@ -353,14 +333,8 @@ def element_seq_from_string(text, source_name, start_line=1):
         # searched for this type of token.  (This special condition keeps us
         # from needed to duplicate the code below that does the searching.)
         if start >= 0:
-            if token_type not in [Token.NEWLINE, Token.EOF]:
-                yield Element(Address(source_name, line, 0), token_type)
+            yield token_type
             index = match.span()[1]
-
-        # If we've reached the end of the string, stop.  Needed because the EOF
-        # token will continue to match even on an empty string.
-        if index == len(text):
-            break
 
         # Search for the next instance of this pattern from the current
         # location.  If we find the pattern, add the result to the queue to be
@@ -369,6 +343,56 @@ def element_seq_from_string(text, source_name, start_line=1):
         if match:
             start = match.span()[0] if match else float('inf')
             heapq.heappush(priority_queue, (start, token_type, regex, match))
+
+def element_seq_from_string(text, source_name, start_line=1):
+    """Given a string, return a sequence of elements present in that string."""
+    tokens = token_seq_from_string(text)
+    return element_seq_from_token_seq(tokens, source_name, start_line)
+
+def element_seq_from_token_seq(tokens, source_name, start_line):
+    """Given a sequence of tokens and strings, return a sequence of elements
+    present in that string by attaching addresses to each of them.  Assumes
+    that the strings don't contain newlines."""
+
+    lineno = start_line
+    offset = 1
+
+    for token in tokens:
+        # Ship token token, at the current address.
+        yield Element(Address(source_name, lineno, offset), token)
+
+        # Update lineno and offset based on the content of this token.
+        if isinstance(token, str):
+            offset += len(token)
+        elif token == Token.NEWLINE:
+            offset = 1
+            lineno += 1
+        else:
+            offset += 3
+
+def compress_element_seq(elements):
+    """Given a sequence of elements, collapse adjacent strings and newlines
+    into single elements.  Assumes that the given elements have sequential
+    addresses.  Modifies some of the existing Element objects, so be careful
+    about using them again."""
+
+    # The current text element that we are building.
+    text_element = None
+
+    for element in elements:
+        if element.content == Token.NEWLINE:
+            element.content = '\n'
+
+        if isinstance(element.content, str):
+            if text_element is None:
+                text_element = element
+            else:
+                text_element.content += element.content
+        else:
+            if text_element is not None:
+                yield text_element
+                text_element = None
+            yield element
 
 def tree_from_element_seq(seq):
     """Given a sequence of elements, use the delimiters and separators to form

@@ -94,57 +94,94 @@ def test_unindent():
     code = "    print('hello')\n    print('world')"
     assert len(code) - len(unindent(code)) == 8
 
-def test_element_seq_from_string1():
-    code = """
-      a
-      b
-      [[[
-          c
-          d
-      |||
-          e
-      ]]]
-      f
-      g
-    """
-    elements = list(element_seq_from_string(code, "dummy.mash"))
+
+# A representative chunk of mash code used in several tests below:
+code_to_parse = """
+        a
+        b
+        [[[
+            c
+            d
+        |||
+            e
+        ]]]
+        f
+        g
+        [[[   ]]]
+"""
+
+def test_token_seq_from_string():
+    # Tokens are extracted from a string correctly.
+    tokens = list(token_seq_from_string(code_to_parse))
+    for token in tokens:
+        print(token.__repr__())
+
+    # Spot check the correctness.
+    assert len(tokens) == 29
+    assert tokens[0] == Token.NEWLINE
+    assert isinstance(tokens[1], str)
+    assert tokens[-2] == Token.CLOSE
+    assert tokens[-1] == Token.NEWLINE
+
+def test_token_seq_from_string2():
+    # When a token is at the very start, nothing breaks.
+    list(token_seq_from_string('[[[ a ]]]'))
+
+def test_element_seq_from_token_seq():
+    tokens = [
+        "abc",
+        Token.NEWLINE,
+        "de",
+        Token.SEPARATOR
+    ]
+
+    elements = list(element_seq_from_token_seq(tokens, 'dummy.mash', 5))
+    for element in elements:
+        print(element)
+
+    # Spot check the correctness.
+    assert len(tokens) == len(elements)
+    assert elements[0].address.lineno == 5
+    assert elements[0].address.offset == 1
+    assert elements[1].address.lineno == 5
+    assert elements[1].address.offset == 4
+    assert elements[3].address.lineno == 6
+    assert elements[3].address.offset == 3
+
+def test_compress_element_seq():
+    elements = element_seq_from_string(code_to_parse, "dummy.mash")
+    elements = compress_element_seq(elements)
+    elements = list(elements)
     for element in elements:
         print(element)
 
     # Correct parsing.
-    assert len(elements) == 7
-    assert elements[0].address.lineno == 1
-    assert elements[1].address.lineno == 4
-    assert elements[2].address.lineno == 4
-    assert elements[3].address.lineno == 7
-    assert elements[4].address.lineno == 7
-    assert elements[5].address.lineno == 9
-    assert elements[6].address.lineno == 9
+    assert len(elements) == 10
+
+    # Correct tracking line numbers.
+    assert elements[0].address.lineno == 1 # a b
+    assert elements[1].address.lineno == 4 # OPEN
+    assert elements[2].address.lineno == 4 # c d
+    assert elements[3].address.lineno == 7 # SEPARATOR
+    assert elements[4].address.lineno == 7 # e
+    assert elements[5].address.lineno == 9 # CLOSE
+    assert elements[6].address.lineno == 9 # f g
+    assert elements[7].address.lineno == 12 # OPEN
+    assert elements[7].address.lineno == 12 # space
+    assert elements[8].address.lineno == 12 # CLOSE
+
+    assert elements[0].address.offset == 1 # a b
+    assert elements[1].address.offset == 9 # OPEN
+    assert elements[2].address.offset == 12 # c d
 
     # No exceptions from __str__.
     elements[0].__str__()
 
-def test_element_seq_from_string2():
-    # When a token is at the very start, nothing breaks.
-    element_seq_from_string('[[[ a ]]]', 'dummy.mash')
-
 def test_element_tree_from_string1():
     # Basic parsing works as expected.
-    code = """
-      a
-      b
-      [[[
-          c
-          d
-      |||
-          e
-      ]]]
-      f
-      g
-    """
-    root = tree_from_string(code, 'dummy.mash')
+    root = tree_from_string(code_to_parse, 'dummy.mash')
     print(root.as_indented_string())
-    assert len(root.children) == 3
+    assert len(root.children) == 4
     assert isinstance(root.children[0], TextLeaf)
     assert isinstance(root.children[1], Frame)
     assert len(root.children[1].children) == 2
@@ -157,7 +194,9 @@ def test_element_tree_from_string2():
     # message.
     with pytest.raises(ValueError) as exc_info:
         tree_from_string('[[[ a \n ||| b \n ||| c ]]]', 'dummy.mash')
-    assert 'dummy.mash, line 3' in str(exc_info)
+    exception = exc_info._excinfo[1]
+    assert exception.filename == 'dummy.mash'
+    assert exception.lineno == 3
 
 def test_element_tree_from_string3():
     # Missing closing delimiters given an error where the frame started.
@@ -405,18 +444,6 @@ def test_at_end():
     root = tree_from_string(code, 'dummy.mash')
     with pytest.raises(ValueError):
         run_tree(root)
-
-def test_exception_address():
-    # Exceptions in included files refer correctly to their source.
-    code = """
-        [[[ include mashlib.mash ]]]
-        [[[ check_for_executable('foobar') ]]]
-    """
-    root = tree_from_string(code, 'dummy.mash')
-    print(root.as_indented_string())
-    with pytest.raises(Exception) as exc_info:
-        run_tree(root)
-    raise exc_info._excinfo[1]
 
 if __name__ == '__main__':  #pragma: nocover
     run_tests_from_pattern()
