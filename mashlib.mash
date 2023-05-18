@@ -82,8 +82,7 @@ def shell(command, stdin=None, check=True):
     job_futures.append(future)
 
 def at_end():
-    # Finish up any jobs that are still running.  Report any exceptions that
-    # occured.
+    # Finish up any jobs that are still running.
     exceptions = []
     for future in job_futures:
         try:
@@ -91,6 +90,7 @@ def at_end():
         except Exception as exception:
             exceptions.append(exception)
 
+    # Report any exceptions that # occured.
     if len(exceptions) == 1:
         raise exceptions[0]
     elif len(exceptions) > 1:

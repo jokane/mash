@@ -416,7 +416,7 @@ def engage(argv):
             shutil.rmtree(".mash-archive")
         argv.remove('-c')
         if len(argv) == 1:
-            return
+            return 0
 
     if len(argv) == 1:
         print('[reading from stdin]')
@@ -435,7 +435,7 @@ def engage(argv):
         print(e)
         print(e.stdout.decode("utf-8", errors='ignore'))
         print(e.stderr.decode("utf-8", errors='ignore'))
-        return
+        return e.returncode
 
     end_time = time.time()
     elapsed = f'{end_time-start_time:.02f}'
@@ -444,6 +444,8 @@ def engage(argv):
         print(result)
         stats = result[0].stats()
         print(f"{stats}; {elapsed} seconds")
+
+    return 0
 
 def main(argv):
     """ Main entry point.  Mostly just logic to respond to restart requests. """
