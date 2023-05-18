@@ -65,6 +65,28 @@ def run_tests_from_pattern(): #pragma nocover
             print('-'*80)
             thing()
             print()
+
+@contextlib.contextmanager
+def engage_string(code, files=None):
+    with temporary_current_directory(linked_files=['mashlib.mash']):
+        filename = 'test.mash'
+        with open(filename, 'w', encoding='utf-8') as output_file:
+            print(code, file=output_file)
+
+        if files is None:
+            files = {}
+
+        for filename2, contents in files.items():
+            with open(filename2, 'w', encoding='utf-8') as output_file:
+                print(contents, file=output_file)
+
+        engage(['mash3', filename])
+        try:
+            yield
+        finally:
+            pass
+
+
 ################################################################################
 
 def test_unindent():
@@ -140,11 +162,11 @@ def test_frame_stats2():
     assert stats == Stats(2, 0, 1)
 
 def test_codeleaf_execute1():
-    # Somthing simple.
+    # Simple code executes.
     CodeLeaf(Address('xyz.mash', 1, 1), None, "print('hello')").execute({})
 
 def test_codeleaf_execute2():
-    # Syntax error.
+    # Broken code raises a syntax error.
     with pytest.raises(SyntaxError):
         CodeLeaf(Address('xyz.mash', 1, 1), None, "print 'hello'").execute({})
 
@@ -191,8 +213,8 @@ def test_vars1():
             [[[ x = 3 ]]]
         ]]]
     """
-    root = tree_from_string(code, 'xyz.mash')
-    root.execute({})
+    with engage_string(code):
+        pass
 
 def test_vars2():
     # Vars from later children replace vars from earlier children.
@@ -222,43 +244,44 @@ def test_restart_request1():
             raise RestartRequest
         ]]]
     """
+    root = tree_from_string(code, '')
     with pytest.raises(RestartRequest):
-        tree_from_string(code, '').execute(default_variables())
+        root.execute(default_variables())
 
 def test_restart_request2():
-    # RestartRequests are correctly handled in main()
-    with temporary_current_directory():
-        code = """
-            [[[
-                import os
-                if not os.path.exists('1'):
-                    os.system('touch 1')
-                    raise RestartRequest
-                else:
-                    os.system('touch 2')
-            ]]]
-        """
-        with open('test.mash', 'w', encoding='utf-8') as output_file:
-            print(code, file=output_file)
-        main(['mash3', 'test.mash'])
+    # RestartRequests are correctly handled.
+    code = """
+        [[[
+            import os
+            if not os.path.exists('1'):
+                os.system('touch 1')
+                raise RestartRequest
+            else:
+                os.system('touch 2')
+        ]]]
+    """
+    with engage_string(code):
         assert os.path.exists('1')
         assert os.path.exists('2')
 
-
 def test_include():
     # Included files are found and imported.
-    with temporary_current_directory():
-        with open('included.mash', 'w', encoding='utf-8') as output_file:
-            print('[[[ def foo():\n    return "bar"]]]',
-                  file=output_file)
-        code = """
-            [[[
-                [[[ include included.mash ]]]
-                foo()
-            ]]]
-        """
-        root = tree_from_string(code, 'xyz.mash')
-        root.execute({})
+    included = """
+        [[[
+            def foo():
+                return "bar"
+        ]]]
+    """
+
+    code = """
+        [[[
+            [[[ include included.mash ]]]
+            foo()
+        ]]]
+    """
+
+    with engage_string(code, files={ 'included.mash': included }):
+        pass
 
 def test_mashlib_shell1():
     # Shell commands run correctly.
@@ -268,13 +291,12 @@ def test_mashlib_shell1():
             shell('ls /dev')
         ]]]
     """
-    root = tree_from_string(code, 'xyz.mash')
-    variables = {}
-    root.execute(variables)
-    variables['at_end']()
+    with engage_string(code):
+        pass
 
 def test_mashlib_shell2():
-    # Broken commands raise exceptions.
+    # Broken commands raise exceptions.  Those exceptions are caught and
+    # handled gracefully.
     code = """
         [[[
             [[[ include mashlib.mash ]]]
@@ -282,25 +304,12 @@ def test_mashlib_shell2():
         ]]]
     """
     root = tree_from_string(code, 'xyz.mash')
-    variables = {}
-    root.execute(variables)
+
     with pytest.raises(subprocess.CalledProcessError):
-        variables['at_end']()
+        run_tree(root)
 
-def test_subprocess_error_report1():
-    # Exceptions from broken commands are caught and reported gracefully.
-    code = """
-        [[[
-            [[[ include mashlib.mash ]]]
-            result = shell('ls /foobar')
-        ]]]
-    """
-
-    with temporary_current_directory(['mashlib.mash']):
-        with open('test.mash', 'w', encoding='utf-8') as output_file:
-            print(code, file=output_file)
-
-        engage(['mash3', 'test.mash'])
+    with engage_string(code):
+        pass
 
 def test_subprocess_max_jobs():
     # The max_jobs setting actually limits the number of parallel shell jobs
@@ -314,12 +323,7 @@ def test_subprocess_max_jobs():
             shell('echo 30 >> nums; sleep 0.1; echo 31 >> nums; sleep 0.1')
         ]]]
     """
-    root = tree_from_string(code, "xyz.mash")
-
-    with temporary_current_directory(['mashlib.mash']):
-        variables = default_variables()
-        root.execute(variables)
-        variables['at_end']()
+    with engage_string(code):
         with open('nums', encoding='utf-8') as numbers_file:
             numbers = numbers_file.read()
 
@@ -337,18 +341,16 @@ def test_subprocess_max_jobs():
 
 def test_at_end():
     # Call to at_end() after full tree is executed.
-    with temporary_current_directory():
-        code = """
-            [[[
-                def at_end():
-                    raise ValueError
-            ]]]
-        """
-        with open('test.mash', 'w', encoding='utf-8') as output_file:
-            print(code, file=output_file)
+    code = """
+        [[[
+            def at_end():
+                raise ValueError
+        ]]]
+    """
+    root = tree_from_string(code, 'x.mash')
+    with pytest.raises(ValueError):
+        run_tree(root)
 
-        with pytest.raises(ValueError):
-            engage(['mash3', 'test.mash'])
 
 if __name__ == '__main__':  #pragma: nocover
     run_tests_from_pattern()

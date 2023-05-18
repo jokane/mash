@@ -405,8 +405,17 @@ def tree_from_element_seq(seq):
 
     return frame
 
-def engage(argv):
-    """ Actually do things, based on what the command line asked for. """
+
+def run_tree(root):
+    """Execute the given tree."""
+    variables = default_variables()
+    result = root.execute(variables)
+    if 'at_end' in variables:
+        variables['at_end']()
+    return result
+
+def run_from_args(argv):
+    """Actually do things, based on what the command line asked for."""
     start_time = time.time()
 
     if '-c' in argv:
@@ -424,13 +433,10 @@ def engage(argv):
     else:
         input_filename = argv[1]
 
-    try:
-        variables = default_variables()
-        leaf = IncludeLeaf(Address(input_filename, 1, 1), None, input_filename)
-        result = leaf.execute(variables)
-        if 'at_end' in variables:
-            variables['at_end']()
+    node = IncludeLeaf(Address(input_filename, 1, 1), None, input_filename)
 
+    try:
+        result = run_tree(node)
     except subprocess.CalledProcessError as e:
         print(e)
         print(e.stdout.decode("utf-8", errors='ignore'))
@@ -441,24 +447,25 @@ def engage(argv):
     elapsed = f'{end_time-start_time:.02f}'
 
     if len(result) > 0:
-        print(result)
         stats = result[0].stats()
         print(f"{stats}; {elapsed} seconds")
 
+    print(f"{elapsed} seconds")
+
     return 0
 
-def main(argv):
-    """ Main entry point.  Mostly just logic to respond to restart requests. """
+def engage(argv):
+    """ Main entry point."""
     done = False
     original_cwd = os.getcwd()
     while not done:
         os.chdir(original_cwd)
         try:
-            engage(argv)
+            run_from_args(argv)
             done = True
         except RestartRequest:
             pass
 
 
 if __name__ == '__main__': # pragma no cover
-    main(sys.argv)
+    engage(sys.argv)
