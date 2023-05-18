@@ -14,6 +14,7 @@ import tempfile
 import traceback
 
 import pytest
+from exceptiongroup import ExceptionGroup
 
 from mash3 import *
 
@@ -69,7 +70,7 @@ def run_tests_from_pattern(): #pragma nocover
 @contextlib.contextmanager
 def engage_string(code, files=None):
     with temporary_current_directory(linked_files=['mashlib.mash']):
-        filename = 'test.mash'
+        filename = 'dummy.mash'
         with open(filename, 'w', encoding='utf-8') as output_file:
             print(code, file=output_file)
 
@@ -93,46 +94,86 @@ def test_unindent():
     code = "    print('hello')\n    print('world')"
     assert len(code) - len(unindent(code)) == 8
 
-def test_element_seq_from_string():
-    elements = list(element_seq_from_string('a\nb[[[ c ||| d ]]] e\n f', 'x'))
+def test_element_seq_from_string1():
+    code = """
+      a
+      b
+      [[[
+          c
+          d
+      |||
+          e
+      ]]]
+      f
+      g
+    """
+    elements = list(element_seq_from_string(code, "dummy.mash"))
+    for element in elements:
+        print(element)
 
-    # Basics.
+    # Correct parsing.
     assert len(elements) == 7
+    assert elements[0].address.lineno == 1
+    assert elements[1].address.lineno == 4
+    assert elements[2].address.lineno == 4
+    assert elements[3].address.lineno == 7
+    assert elements[4].address.lineno == 7
+    assert elements[5].address.lineno == 9
+    assert elements[6].address.lineno == 9
 
     # No exceptions from __str__.
     elements[0].__str__()
 
-    # Deal correctly when a token is at the very start.
-    tree_from_string('[[[ a ]]]', 'x')
+def test_element_seq_from_string2():
+    # When a token is at the very start, nothing breaks.
+    element_seq_from_string('[[[ a ]]]', 'dummy.mash')
 
-def test_element_tree_from_string():
-    # Basics
-    root = tree_from_string('a\nb[[[c|||d]]]e\nf', 'x.mash')
+def test_element_tree_from_string1():
+    # Basic parsing works as expected.
+    code = """
+      a
+      b
+      [[[
+          c
+          d
+      |||
+          e
+      ]]]
+      f
+      g
+    """
+    root = tree_from_string(code, 'dummy.mash')
     print(root.as_indented_string())
     assert len(root.children) == 3
     assert isinstance(root.children[0], TextLeaf)
     assert isinstance(root.children[1], Frame)
     assert len(root.children[1].children) == 2
     assert isinstance(root.children[1].children[0], CodeLeaf)
+    assert root.children[1].children[0].address.lineno == 4
     assert isinstance(root.children[1].children[1], TextLeaf)
 
-
-    # Extra separator, with file name and line in error message.
+def test_element_tree_from_string2():
+    # Extra separators generate an error, with with file name and line in error
+    # message.
     with pytest.raises(ValueError) as exc_info:
-        tree_from_string('[[[ a \n ||| b \n ||| c ]]]', 'xyz.mash')
+        tree_from_string('[[[ a \n ||| b \n ||| c ]]]', 'dummy.mash')
+    assert 'dummy.mash, line 3' in str(exc_info)
 
-    assert 'xyz.mash, line 3' in str(exc_info)
-
-    # Missing closing delimiter.  Error should show where the frame started.
+def test_element_tree_from_string3():
+    # Missing closing delimiters given an error where the frame started.
     with pytest.raises(ValueError) as exc_info:
-        tree_from_string('1  \n 2 \n 3 [[[ a \n b \n c \n d', 'abc.mash')
-    assert 'abc.mash, line 3' in str(exc_info)
+        tree_from_string('1  \n 2 \n 3 [[[ a \n b \n c \n d', 'dummy.mash')
+    exception = exc_info._excinfo[1]
+    assert exception.filename == 'dummy.mash'
+    assert exception.lineno == 3
 
-    # Extra closing delimiter.
+def test_element_tree_from_string4():
+    # Extra closing delimiters give an error at the end.
     with pytest.raises(ValueError):
-        tree_from_string('[[[ \n a \n ||| \n b \n ]]] \n c \n ]]]', 'x')
+        tree_from_string('[[[ \n a \n ||| \n b \n ]]] \n c \n ]]]', 'dummy.mash')
 
 def test_dash_c():
+    # Running with -c removes the archives.
     with temporary_current_directory():
         os.mkdir('.mash')
         os.mkdir('.mash-archive')
@@ -140,13 +181,8 @@ def test_dash_c():
         assert not os.path.exists('.mash')
         assert not os.path.exists('.mash-archive')
 
-def test_file_input():
-    with temporary_current_directory():
-        with open('test.mash', 'w', encoding='utf-8') as output_file:
-            print('[[[ print() ||| b ]]]', file=output_file)
-        engage(['mash3', 'test.mash'])
-
 def test_stdin_input():
+    # Nothing explodes when we give (empty) stdin as the input.
     engage(['mash3'])
 
 def test_frame_stats1():
@@ -159,49 +195,50 @@ def test_frame_stats2():
     print(root.as_indented_string())
     stats = root.stats()
     print(stats)
-    assert stats == Stats(2, 0, 1)
+    assert stats == Stats(2, 0, 0)
 
 def test_codeleaf_execute1():
     # Simple code executes.
-    CodeLeaf(Address('xyz.mash', 1, 1), None, "print('hello')").execute({})
+    CodeLeaf(Address('dummy.mash', 1, 1), None, "print('hello')").execute({})
 
 def test_codeleaf_execute2():
     # Broken code raises a syntax error.
     with pytest.raises(SyntaxError):
-        CodeLeaf(Address('xyz.mash', 1, 1), None, "print 'hello'").execute({})
+        CodeLeaf(Address('dummy.mash', 1, 1), None, "print 'hello'").execute({})
 
 def test_codeleaf_execute3():
     # Correct line number.
     with pytest.raises(Exception) as exc_info:
-        CodeLeaf(Address('xyz.mash', 5, 1),
+        CodeLeaf(Address('dummy.mash', 5, 1),
                  None,
                  "  \n\n\n  raise ValueError('sadness')").execute({})
 
     formatted_tb = '\n'.join(traceback.format_tb(exc_info._excinfo[2]))
-    assert '"xyz.mash", line 8' in formatted_tb
+    print(formatted_tb)
+    assert '"dummy.mash", line 8' in formatted_tb
 
 def test_textleaf_execute1():
     # Simple.
-    TextLeaf(Address('xyz.mash', 1, 1), None, "print('hello')").execute({})
+    TextLeaf(Address('dummy.mash', 1, 1), None, "print('hello')").execute({})
 
 def test_textleaf_execute2():
     # Text leaves don't execute their content as code -- no exception here.
-    TextLeaf(Address('xyz.mash', 1, 1), None, "print 'hello'").execute({})
+    TextLeaf(Address('dummy.mash', 1, 1), None, "print 'hello'").execute({})
 
 def test_frame_execute():
     # Something simple.
-    root = tree_from_string('A [[[ print("B") ]]] C', 'xyz.mash')
+    root = tree_from_string('A [[[ print("B") ]]] C', 'dummy.mash')
     root.execute({})
 
 def test_frame_execute2():
     # Check recursive execution, normal case.
-    root = tree_from_string('[[[ print("B") ||| [[[ print("C") ||| D ]]] ]]]', 'xyz.mash')
+    root = tree_from_string('[[[ print("B") ||| [[[ print("C") ||| D ]]] ]]]', 'dummy.mash')
     root.execute({})
 
 
 def test_frame_execute3():
     # Check recursive execution, failing.
-    root = tree_from_string('[[[ print("B") ||| [[[ print C ||| D ]]] ]]]', 'xyz.mash')
+    root = tree_from_string('[[[ print("B") ||| [[[ print C ||| D ]]] ]]]', 'dummy.mash')
     with pytest.raises(SyntaxError):
         root.execute({})
 
@@ -231,7 +268,7 @@ def test_vars2():
         ]]]
     """
     variables = {}
-    root = tree_from_string(code, 'xyz.mash')
+    root = tree_from_string(code, 'dummy.mash')
     root.execute(variables)
 
     assert 'x' in variables
@@ -275,12 +312,12 @@ def test_include():
 
     code = """
         [[[
-            [[[ include included.mash ]]]
+            [[[ include included-dummy.mash ]]]
             foo()
         ]]]
     """
 
-    with engage_string(code, files={ 'included.mash': included }):
+    with engage_string(code, files={ 'included-dummy.mash': included }):
         pass
 
 def test_mashlib_shell1():
@@ -300,12 +337,30 @@ def test_mashlib_shell2():
     code = """
         [[[
             [[[ include mashlib.mash ]]]
-            result = shell('ls /foobar')
+            result = shell('ls foobar')
         ]]]
     """
-    root = tree_from_string(code, 'xyz.mash')
+    root = tree_from_string(code, 'dummy.mash')
 
     with pytest.raises(subprocess.CalledProcessError):
+        run_tree(root)
+
+    with engage_string(code):
+        pass
+
+def test_mashlib_shell3():
+    # Multiple broken commands raise an ExecptionGroup, which is caught and
+    # reported gracefully.
+    code = """
+        [[[
+            [[[ include mashlib.mash ]]]
+            result = shell('ls foobar')
+            result = shell('ls baz')
+        ]]]
+    """
+    root = tree_from_string(code, 'dummy.mash')
+
+    with pytest.raises(ExceptionGroup):
         run_tree(root)
 
     with engage_string(code):
@@ -347,10 +402,21 @@ def test_at_end():
                 raise ValueError
         ]]]
     """
-    root = tree_from_string(code, 'x.mash')
+    root = tree_from_string(code, 'dummy.mash')
     with pytest.raises(ValueError):
         run_tree(root)
 
+def test_exception_address():
+    # Exceptions in included files refer correctly to their source.
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[ check_for_executable('foobar') ]]]
+    """
+    root = tree_from_string(code, 'dummy.mash')
+    print(root.as_indented_string())
+    with pytest.raises(Exception) as exc_info:
+        run_tree(root)
+    raise exc_info._excinfo[1]
 
 if __name__ == '__main__':  #pragma: nocover
     run_tests_from_pattern()

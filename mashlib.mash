@@ -35,12 +35,9 @@ if not mashlib_initialized:
     # A list of futures for jobs that have been submitted.
     job_futures = []
 
-
 def check_for_executable(exe):
-    """
-    Check whether some executable with the given name exists in the path.  If it
-    does not exist, complain.
-    """
+    """Check whether some executable with the given name exists in the path.
+    If it does not exist, complain."""
     if exe not in executables_checked and shutil.which(exe) is None:
         raise Exception(f'Executable {exe} not found in path.')
     executables_checked.add(exe)
@@ -97,3 +94,4 @@ def at_end():
         raise ExceptionGroup("multiple failed jobs", exceptions)
 
 ]]]
+

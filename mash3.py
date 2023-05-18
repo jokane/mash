@@ -41,6 +41,7 @@ import sys
 import time
 
 from abc import ABC, abstractmethod
+from exceptiongroup import ExceptionGroup
 
 class RestartRequest (Exception):
     """ A special exception to be raised when some part of the code wants to
@@ -53,6 +54,7 @@ class Token(enum.Enum):
     SEPARATOR = 3
     CLOSE = 4
     NEWLINE = 5
+    EOF = 6
     def __lt__(self, other):
         return self.value < other.value
 
@@ -132,13 +134,11 @@ class FrameTreeNode(ABC):
         """Return a Stats object for this node and its descendants."""
 
     def announce(self, variables):
-        """Print some details about this node, to be called just before executing."""
-        # if variables is None:
-        #     variables = self.default_variables()
-        # print(f"Executing {type(self)} with variables ({variables.keys()}):")
-
-        # print(self.as_indented_string(indent_level=1), end='')
-        # print()
+        """Print some details about this node, to be called just before
+        executing."""
+        print(f"Executing {type(self)} with {len(variables)} variables:")
+        print(self.as_indented_string(indent_level=1), end='')
+        print()
 
 def default_variables():
     """Return a dictionary to use as the variables in cases where no
@@ -155,7 +155,7 @@ class Frame(FrameTreeNode):
 
     def as_indented_string(self, indent_level=0):
         r = ''
-        r += ('  '*indent_level) + '[[[\n'
+        r += ('  '*indent_level) + f'[[[ {self.address}\n'
         for child in self.children:
             r += child.as_indented_string(indent_level+1)
         r += ('  '*indent_level) + ']]]\n'
@@ -203,7 +203,11 @@ class FrameTreeLeaf(FrameTreeNode):
         """A short string to mark what kind of leaf this is."""
 
     def as_indented_string(self, indent_level=0):
-        return ('  '*indent_level) + f'{self.line_marker()} {self.content.strip().__repr__()}\n'
+        x = self.content.__repr__()
+        if len(x) > 60:
+            x = x[:60] + '...'
+        return (('  '*indent_level)
+          + f'{self.line_marker()} {x} {self.address}\n')
 
 class CodeLeaf(FrameTreeLeaf):
     """A leaf node representing Python code to be executed."""
@@ -294,7 +298,9 @@ def element_seq_from_string(text, source_name, start_line=1):
     patterns = [(Token.OPEN, r'\[\[\['),
                 (Token.SEPARATOR,  r'\|\|\|'),
                 (Token.CLOSE,  r'\]\]\]'),
-                (Token.NEWLINE, '\n')]
+                (Token.NEWLINE, '\n'),
+                (Token.EOF, '$'),
+                ]
 
     # Pointer to the current location in the text.
     index = 0
@@ -316,6 +322,7 @@ def element_seq_from_string(text, source_name, start_line=1):
     heapq.heapify(priority_queue)
 
     text_so_far = ''
+    element_start_line = line
 
     # Keep emitting elements until we run out of them.
     while priority_queue:
@@ -327,7 +334,7 @@ def element_seq_from_string(text, source_name, start_line=1):
             text_so_far += text[index:start]
 
         # Is it a newline?
-        # - If so, update the line number, but also incude it in the actual
+        # - If so, update the line number, but also include it in the actual
         # text.
         # - If not, then the text element we (may) have been assembling is
         # complete.
@@ -335,8 +342,10 @@ def element_seq_from_string(text, source_name, start_line=1):
             line += 1
             text_so_far += '\n'
         elif len(text_so_far) > 0:
-            yield Element(Address(source_name, line, 0), text_so_far)
+            if len(text_so_far.strip()) > 0:
+                yield Element(Address(source_name, element_start_line, 0), text_so_far)
             text_so_far = ''
+            element_start_line = line
 
         # Emit this token and move forward in the text.  Except if we have a
         # negative start value, which is a special case set by the
@@ -344,21 +353,22 @@ def element_seq_from_string(text, source_name, start_line=1):
         # searched for this type of token.  (This special condition keeps us
         # from needed to duplicate the code below that does the searching.)
         if start >= 0:
-            if token_type != Token.NEWLINE:
+            if token_type not in [Token.NEWLINE, Token.EOF]:
                 yield Element(Address(source_name, line, 0), token_type)
             index = match.span()[1]
 
+        # If we've reached the end of the string, stop.  Needed because the EOF
+        # token will continue to match even on an empty string.
+        if index == len(text):
+            break
+
         # Search for the next instance of this pattern from the current
-        # location.  If we find the pattern, add the result to the queue.
+        # location.  If we find the pattern, add the result to the queue to be
+        # processed in the future.
         match = regex.search(text, index)
         if match:
             start = match.span()[0] if match else float('inf')
             heapq.heappush(priority_queue, (start, token_type, regex, match))
-
-
-    # If any text is left at the end, emit that too.
-    if index < len(text):
-        yield Element(Address(source_name, line, 0), text[index:])
 
 def tree_from_element_seq(seq):
     """Given a sequence of elements, use the delimiters and separators to form
@@ -435,13 +445,28 @@ def run_from_args(argv):
 
     node = IncludeLeaf(Address(input_filename, 1, 1), None, input_filename)
 
+    def report_exception(e):
+        print(e)
+        def decode_and_print_if_not_empty(x):
+            x = x.decode("utf-8", errors='ignore')
+            if len(x.strip()) > 0:
+                print(x)
+        decode_and_print_if_not_empty(e.stdout)
+        decode_and_print_if_not_empty(e.stderr)
+
     try:
         result = run_tree(node)
     except subprocess.CalledProcessError as e:
-        print(e)
-        print(e.stdout.decode("utf-8", errors='ignore'))
-        print(e.stderr.decode("utf-8", errors='ignore'))
+        report_exception(e)
         return e.returncode
+    except ExceptionGroup as eg:
+        print(80*'-')
+        for e in eg.exceptions:
+            report_exception(e)
+            print(80*'-')
+        print(f'{len(eg.exceptions)} total errors')
+        return 255
+
 
     end_time = time.time()
     elapsed = f'{end_time-start_time:.02f}'
