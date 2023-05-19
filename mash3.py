@@ -92,23 +92,23 @@ class Element:
 
 class Stats:
     """Statistics for the complexity of a frame tree."""
-    def __init__(self, frames, code, text):
+    def __init__(self, frames, codes, includes):
         self.frames = frames
-        self.code = code
-        self.text = text
+        self.codes = codes
+        self.includes = includes
 
     def __add__(self, other):
         return Stats(self.frames + other.frames,
-                     self.code + other.code,
-                     self.text + other.text)
+                     self.codes + other.codes,
+                     self.includes + other.includes)
 
     def __eq__(self, other):
         return (self.frames == other.frames
-                and self.code == other.code
-                and self.text == other.text)
+                and self.codes == other.codes
+                and self.includes == other.includes)
 
     def __str__(self):
-        return f'{self.frames} frames; {self.code}+{self.text} leaves'
+        return f'{self.frames} frames; {self.codes} code blocks; {self.includes} includes'
 
 class FrameTreeNode(ABC):
     """A node in the frame tree.  Could be a frame (i.e. an internal node), a
@@ -122,23 +122,20 @@ class FrameTreeNode(ABC):
     @abstractmethod
     def execute(self, variables):
         """Do the work represented by this node, if any.  Return a list of
-        objects that should replace this one in the tree."""
+        objects that should replace this one in the tree and a Stats object
+        quantifying the work that was done to get there."""
 
     @abstractmethod
     def as_indented_string(self, indent_level=0):
         """Return a nicely-formatted representation of this node, including
         its descendants, indented two spaces for each level."""
 
-    @abstractmethod
-    def stats(self):
-        """Return a Stats object for this node and its descendants."""
-
     def announce(self, variables):
         """Print some details about this node, to be called just before
         executing."""
-        print(f"Executing {type(self)} with {len(variables)} variables:")
-        print(self.as_indented_string(indent_level=1), end='')
-        print()
+        # print(f"Executing {type(self)} with {len(variables)} variables:")
+        # print(self.as_indented_string(indent_level=1), end='')
+        # print()
 
 def default_variables():
     """Return a dictionary to use as the variables in cases where no
@@ -166,31 +163,35 @@ class Frame(FrameTreeNode):
         results, and then run any code elements here."""
         self.announce(variables)
 
+        stats = Stats(1, 0, 0)
+
         # Execute all of the child frames.
-        self.execute_children(variables, True)
+        stats += self.execute_children(variables, True)
+
 
         # Child frames are done.  Our child list should now be just leaves.
         # Execute each of them.
-        self.execute_children(variables, False)
+        stats += self.execute_children(variables, False)
 
         # All done.
-        return self.children
+        return self.children, stats
 
     def execute_children(self, variables, frames_only):
         """Allow each child to execute in parallel.  Wait for all of them to
         finish.  Replace each child with the replacements that it returns."""
         new_children = []
+        stats = Stats(0, 0, 0)
         for child in self.children:
             if frames_only and not isinstance(child, Frame):
                 new_children.append(child)
             else:
-                child_result = child.execute(variables)
+                child_result, child_stats = child.execute(variables)
                 new_children += child_result
+                stats += child_stats
 
         self.children = new_children
 
-    def stats(self):
-        return sum([child.stats() for child in self.children], start=Stats(1, 0, 0))
+        return stats
 
 class FrameTreeLeaf(FrameTreeNode):
     """A leaf node.  Base class for CodeLeaf, TextLeaf, and IncludeLeaf."""
@@ -226,26 +227,20 @@ class CodeLeaf(FrameTreeLeaf):
         code_obj = compile(source, self.address.filename, 'exec')
         exec(code_obj, variables, variables)
 
-        return [ TextLeaf(self.address, self.parent, '') ]
+        return [ TextLeaf(self.address, self.parent, '') ], Stats(0, 1, 0)
 
     def line_marker(self):
         return '*'
-
-    def stats(self):
-        return Stats(0, 1, 0)
 
 class TextLeaf(FrameTreeLeaf):
     """A leaf node representing just text."""
 
     def execute(self, variables):
         """ Nothing to do here."""
-        return [ self ]
+        return [ self ], Stats(0, 0, 0)
 
     def line_marker(self):
         return '.'
-
-    def stats(self):
-        return Stats(0, 0, 1)
 
 class IncludeLeaf(FrameTreeLeaf):
     """A leaf node representing the inclusion of another mash file."""
@@ -260,17 +255,14 @@ class IncludeLeaf(FrameTreeLeaf):
 
         if root is None:
             print(f'[{self.content}: nothing there]')
-            return []
+            return [], Stats(0, 0, 0)
 
-        result = root.execute(variables)
+        result, stats = root.execute(variables)
 
-        return result
+        return result, stats + Stats(0, 0, 1)
 
     def line_marker(self):
         return '#'
-
-    def stats(self):
-        return Stats(0, 0, 0)
 
 def unindent(s):
     """Given a string, modify each line by removing the whitespace that appears
@@ -443,10 +435,10 @@ def tree_from_element_seq(seq):
 def run_tree(root):
     """Execute the given tree."""
     variables = default_variables()
-    result = root.execute(variables)
+    result, stats = root.execute(variables)
     if 'at_end' in variables:
         variables['at_end']()
-    return result
+    return result, stats
 
 def run_from_args(argv):
     """Actually do things, based on what the command line asked for."""
@@ -479,7 +471,7 @@ def run_from_args(argv):
         decode_and_print_if_not_empty(e.stderr)
 
     try:
-        result = run_tree(node)
+        _, stats = run_tree(node)
     except subprocess.CalledProcessError as e:
         report_exception(e)
         return e.returncode
@@ -495,11 +487,7 @@ def run_from_args(argv):
     end_time = time.time()
     elapsed = f'{end_time-start_time:.02f}'
 
-    if len(result) > 0:
-        stats = result[0].stats()
-        print(f"{stats}; {elapsed} seconds")
-
-    print(f"{elapsed} seconds")
+    print(f"{stats}; {elapsed} seconds")
 
     return 0
 

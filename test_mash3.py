@@ -3,6 +3,8 @@
 # pylint: disable=wildcard-import
 # pylint: disable=unused-wildcard-import
 # pylint: disable=protected-access
+# pylint: disable=invalid-name
+
 
 """Tests for mash and mashlib.  Usually run via the check script, but can be
 used from the command line as well to run single tests."""
@@ -211,6 +213,13 @@ def test_element_tree_from_string4():
     with pytest.raises(ValueError):
         tree_from_string('[[[ \n a \n ||| \n b \n ]]] \n c \n ]]]', 'dummy.mash')
 
+def test_frame_node_long_contents():
+    # Long node contents are trimmed for viewing.
+    node = TextLeaf(Address('dummy.mash', 1, 1), None, 1000*'-')
+    ais = node.as_indented_string()
+    print(ais)
+    assert len(ais) < 100
+
 def test_dash_c():
     # Running with -c removes the archives.
     with temporary_current_directory():
@@ -224,17 +233,19 @@ def test_stdin_input():
     # Nothing explodes when we give (empty) stdin as the input.
     engage(['mash3'])
 
-def test_frame_stats1():
-    root = tree_from_string('a\nb[[[c|||d]]]e\nf', '')
-    stats = root.stats()
-    assert stats == Stats(2, 1, 3)
-
-def test_frame_stats2():
-    root = tree_from_string('[[[ include abc ]]]', '')
+def test_frame_stats():
+    root = tree_from_string('[[[ include mashlib.mash ]]] a\nb[[[print()|||d]]]e\nf', 'dummy.mash')
     print(root.as_indented_string())
-    stats = root.stats()
+    _, stats = run_tree(root)
     print(stats)
-    assert stats == Stats(2, 0, 0)
+
+    # 5 frames:
+    # - top level of main document
+    # - frame with include directive
+    # - top frame of mashlib
+    # - big frame spanning most of mashlib
+    # - short one in the main document
+    assert stats == Stats(5, 2, 1)
 
 def test_codeleaf_execute1():
     # Simple code executes.
