@@ -74,8 +74,6 @@ if not mashlib_initialized:
           #print("%s --> %s" % (full_file_name, archive_directory))
           shutil.move(full_file_name, os.path.join(archive_directory, file_name))
 
-
-
     # Make sure we have a build directory and that it's the current/working
     # directory.
     if not os.path.exists(build_directory):
@@ -141,3 +139,4 @@ def at_end():
         raise ExceptionGroup("multiple failed jobs", exceptions)
 
 ]]]
+

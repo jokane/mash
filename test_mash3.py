@@ -70,34 +70,24 @@ def run_tests_from_pattern(): #pragma nocover
             thing()
             print()
 
-@contextlib.contextmanager
-def engage_string(code, files=None):
+def engage_string(code):
+    filename = 'dummy.mash'
+    with open(filename, 'w', encoding='utf-8') as output_file:
+        print(code, file=output_file)
+    engage(['mash3', filename])
+
+
+@pytest.fixture(autouse=True)
+def start_in_temp_directory():
+    """All tests run with a "clean" temporary current directory, containing (a
+    symbolic link to) mashlib, and nothing else."""
+
     test_script_dir = os.path.dirname(os.path.abspath(__file__))
     linked_files = ['mashlib.mash']
     linked_files = map(lambda x: os.path.join(test_script_dir, x), linked_files)
 
-    with temporary_current_directory(linked_files):
-        filename = 'dummy.mash'
-        with open(filename, 'w', encoding='utf-8') as output_file:
-            print(code, file=output_file)
-
-        if files is None:
-            files = {}
-
-        for filename2, contents in files.items():
-            with open(filename2, 'w', encoding='utf-8') as output_file:
-                print(contents, file=output_file)
-
-        engage(['mash3', filename])
-        try:
-            yield
-        finally:
-            pass
-
-@pytest.fixture(autouse=True)
-def start_in_test_directory():
-    os.chdir(os.path.dirname(os.path.abspath(__file__)))
-    yield
+    with temporary_current_directory(linked_files=linked_files):
+        yield
 
 ################################################################################
 
@@ -309,8 +299,7 @@ def test_vars1():
             [[[ x = 3 ]]]
         ]]]
     """
-    with engage_string(code):
-        pass
+    engage_string(code)
 
 def test_vars2():
     # Vars from later children replace vars from earlier children.
@@ -356,9 +345,9 @@ def test_restart_request2():
                 os.system('touch 2')
         ]]]
     """
-    with engage_string(code):
-        assert os.path.exists('1')
-        assert os.path.exists('2')
+    engage_string(code)
+    assert os.path.exists('1')
+    assert os.path.exists('2')
 
 def test_include():
     # Included files are found and imported.
@@ -375,9 +364,10 @@ def test_include():
             foo()
         ]]]
     """
+    with open('included-dummy.mash', 'w') as output:
+        print(included, file=output)
 
-    with engage_string(code, files={ 'included-dummy.mash': included }):
-        pass
+    engage_string(code)
 
 def test_mashlib_shell1():
     # Shell commands run correctly.
@@ -387,12 +377,10 @@ def test_mashlib_shell1():
             shell('ls /dev')
         ]]]
     """
-    with engage_string(code):
-        pass
+    engage_string(code)
 
 def test_mashlib_shell2():
-    # Broken commands raise exceptions.  Those exceptions are caught and
-    # handled gracefully.
+    # Broken commands raise exceptions.
     code = """
         [[[
             [[[ include mashlib.mash ]]]
@@ -400,16 +388,22 @@ def test_mashlib_shell2():
         ]]]
     """
     root = tree_from_string(code, 'dummy.mash')
-
     with pytest.raises(subprocess.CalledProcessError):
+        os.system('pwd; ls -l')
         run_tree(root)
 
-    with engage_string(code):
-        pass
-
 def test_mashlib_shell3():
-    # Multiple broken commands raise an ExecptionGroup, which is caught and
-    # reported gracefully.
+    # Those exceptions are caught and handled gracefully.
+    code = """
+        [[[
+            [[[ include mashlib.mash ]]]
+            shell('ls foobar')
+        ]]]
+    """
+    engage_string(code)
+
+def test_mashlib_shell4():
+    # Multiple broken commands raise an ExecptionGroup.
     code = """
         [[[
             [[[ include mashlib.mash ]]]
@@ -418,12 +412,19 @@ def test_mashlib_shell3():
         ]]]
     """
     root = tree_from_string(code, 'dummy.mash')
-
     with pytest.raises(ExceptionGroup):
         run_tree(root)
 
-    with engage_string(code):
-        pass
+def test_mashlib_shell5():
+    # ExceptionGroups are caught and reported gracefully.
+    code = """
+        [[[
+            [[[ include mashlib.mash ]]]
+            result = shell('ls foobar')
+            result = shell('ls baz')
+        ]]]
+    """
+    engage_string(code)
 
 def test_subprocess_max_jobs():
     # The max_jobs setting actually limits the number of parallel shell jobs
@@ -437,9 +438,10 @@ def test_subprocess_max_jobs():
             shell('echo 30 >> nums; sleep 0.1; echo 31 >> nums; sleep 0.1')
         ]]]
     """
-    with engage_string(code):
-        with open('nums', encoding='utf-8') as numbers_file:
-            numbers = numbers_file.read()
+    engage_string(code)
+
+    with open('nums', encoding='utf-8') as numbers_file:
+        numbers = numbers_file.read()
 
     numbers = list(map(int, numbers.strip().split('\n')))
     print(numbers)
