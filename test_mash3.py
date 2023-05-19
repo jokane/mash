@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 import traceback
+import os
 
 import pytest
 from exceptiongroup import ExceptionGroup

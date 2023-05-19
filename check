@@ -4,7 +4,7 @@ if [ $# -eq 0 ]
 then
     pylint *.py || true
     coverage run --omit=/usr*,/opt*,*dummy* -m pytest
-    coverage report -m
+    ./coverage-report
 else
     ./test_mash3.py $@
 fi
