@@ -85,7 +85,7 @@ def check_for_executable(exe):
     """Check whether some executable with the given name exists in the path.
     If it does not exist, complain."""
     if exe not in executables_checked and shutil.which(exe) is None:
-        raise Exception(f'Executable {exe} not found in path.')
+        raise ValueError(f'Executable {exe} not found in path.')
     executables_checked.add(exe)
 
 def shell(command, stdin=None, check=True):

@@ -84,7 +84,9 @@ def engage_string(code):
     filename = 'dummy.mash'
     with open(filename, 'w', encoding='utf-8') as output_file:
         print(code, file=output_file)
-    engage(['mash3', filename])
+
+    with temporarily_changed_directory('.'):
+        engage(['mash3', filename])
 
 
 @pytest.fixture(autouse=True)
@@ -390,7 +392,6 @@ def test_mashlib_shell1():
             shell('ls /dev')
         ]]]
     """
-    os.system('pwd; ls -l')
     engage_string(code)
 
 def test_mashlib_shell2():
@@ -439,6 +440,17 @@ def test_mashlib_shell5():
     """
     engage_string(code)
 
+def test_mashlib_shell6():
+    # Missing executables are noticed.
+    code = """
+        [[[
+            [[[ include mashlib.mash ]]]
+            shell('foobar')
+        ]]]
+    """
+    with pytest.raises(ValueError):
+        engage_string(code)
+
 def test_subprocess_max_jobs():
     # The max_jobs setting actually limits the number of parallel shell jobs
     # running at a time.
@@ -453,7 +465,7 @@ def test_subprocess_max_jobs():
     """
     engage_string(code)
 
-    with open('nums', encoding='utf-8') as numbers_file:
+    with open('.mash/nums', encoding='utf-8') as numbers_file:
         numbers = numbers_file.read()
 
     numbers = list(map(int, numbers.strip().split('\n')))
@@ -479,6 +491,30 @@ def test_at_end():
     root = tree_from_string(code, 'dummy.mash')
     with pytest.raises(ValueError):
         run_tree(root)
+
+def test_build_dir_created():
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[ shell('touch hello') ]]] 
+        [[[ shell('mkdir world') ]]] 
+    """
+
+    # The first run creates the build directory but not the archive.
+    engage_string(code)
+    assert os.path.isdir('.mash')
+    assert os.path.exists('.mash/hello')
+    assert os.path.isdir('.mash/world')
+    assert not os.path.exists('.mash-archive')
+
+
+    # A second run creates the archive and moves things into it.
+    engage_string(code)
+    assert os.path.isdir('.mash-archive')
+    assert os.path.exists('.mash-archive/hello')
+    assert os.path.isdir('.mash-archive/world')
+
+    # A third run will need to rmtree in the archive.
+    engage_string(code)
 
 if __name__ == '__main__':  #pragma: nocover
     run_tests_from_pattern()
