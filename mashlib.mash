@@ -1,5 +1,12 @@
 [[[
+"""A library of "standard" functions that provide many of the basic operations
+that one might want to do in a mash document.  Usually include this near the
+start."""
+
 # vim: set ft=python :
+# pylint: disable=invalid-name
+# pylint: disable=global-statement
+
 
 import concurrent.futures
 import os
@@ -7,17 +14,10 @@ import resource
 import shutil
 import subprocess
 import sys
-import re
-import filecmp
-import glob
-import hashlib
 
 
 from exceptiongroup import ExceptionGroup
 
-# A library of "standard" functions that provide many of the basic operations
-# that one might want to do on a mash frame.  Most mash documents will include
-# this near the start.
 
 # First, some initialization.  This should only happen once.
 try:
@@ -65,14 +65,14 @@ if not mashlib_initialized:
     # Move anything from the existing build directory to the archive directory.
     if os.path.exists(build_directory):
         for file_name in os.listdir(build_directory):
-          if not os.path.exists(archive_directory):
-              os.makedirs(archive_directory)
-          full_file_name = os.path.join(build_directory, file_name)
-          full_file_name_archive = os.path.join(archive_directory, file_name)
-          if os.path.isdir(full_file_name_archive):
-              shutil.rmtree(full_file_name_archive)
-          #print("%s --> %s" % (full_file_name, archive_directory))
-          shutil.move(full_file_name, os.path.join(archive_directory, file_name))
+            if not os.path.exists(archive_directory):
+                os.makedirs(archive_directory)
+            full_file_name = os.path.join(build_directory, file_name)
+            full_file_name_archive = os.path.join(archive_directory, file_name)
+            if os.path.isdir(full_file_name_archive):
+                shutil.rmtree(full_file_name_archive)
+            #print("%s --> %s" % (full_file_name, archive_directory))
+            shutil.move(full_file_name, os.path.join(archive_directory, file_name))
 
     # Make sure we have a build directory and that it's the current/working
     # directory.
@@ -95,7 +95,7 @@ def shell(command, stdin=None, check=True):
     In addition, this object has attributes tacked on to it showing the user
     time and system time consumed, as reported by getrusage."""
     global job_executor
-    
+
     if job_executor is None:
         job_executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_jobs)
 
@@ -117,26 +117,27 @@ def shell(command, stdin=None, check=True):
         usage_after = resource.getrusage(resource.RUSAGE_CHILDREN)
         completed_process.user_time = usage_after.ru_utime - usage_before.ru_utime
         completed_process.sys_time = usage_after.ru_stime - usage_before.ru_stime
-        
+
         return completed_process
 
     future = job_executor.submit(run_job)
     job_futures.append(future)
 
 def at_end():
+    """Executed automatically at the end of the run.  Finishes outstanding jobs
+    and raises and exceptions that we've been saving up."""
     # Finish up any jobs that are still running.
     exceptions = []
     for future in job_futures:
         try:
             future.result()
-        except Exception as exception:
+        except Exception as exception:  #pylint: disable=broad-except
             exceptions.append(exception)
 
     # Report any exceptions that occured.
     if len(exceptions) == 1:
         raise exceptions[0]
-    elif len(exceptions) > 1:
+    if len(exceptions) > 1:
         raise ExceptionGroup("multiple failed jobs", exceptions)
 
 ]]]
-

@@ -30,9 +30,10 @@ def full_check():
             mash_code = mash_file.read()
 
         py_code = mash_code
-        py_code = re.sub(r'\[\[\[', '   ', py_code)
-        py_code = re.sub(r'\|\|\|', '   ', py_code)
-        py_code = re.sub(r'\]\]\]', '   ', py_code)
+        py_code = re.sub(r'\[\[\[', '', py_code)
+        py_code = re.sub(r'\|\|\|', '', py_code)
+        py_code = re.sub(r'\]\]\]', '', py_code)
+        py_code = py_code.rstrip()
 
         with open(py_filename, 'w', encoding='utf-8') as py_file:
             print(py_code, file=py_file)
