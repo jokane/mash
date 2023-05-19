@@ -62,13 +62,23 @@ def run_tests_from_pattern(): #pragma nocover
     except IndexError:
         pass
 
+    ok = False
     for name, thing in list(globals().items()):
         if 'test_' in name and pattern in name:
             print('-'*80)
             print(name)
             print('-'*80)
+            x = start_in_temp_directory()
+            next(x)
             thing()
+            try:
+                next(x)
+            except StopIteration:
+                pass
             print()
+            ok = True
+    if not ok:
+        raise ValueError(f'No tests matched pattern {pattern}.')
 
 def engage_string(code):
     filename = 'dummy.mash'
@@ -78,6 +88,9 @@ def engage_string(code):
 
 
 @pytest.fixture(autouse=True)
+def fixture_start_in_temp_directory():
+    yield from start_in_temp_directory()
+
 def start_in_temp_directory():
     """All tests run with a "clean" temporary current directory, containing (a
     symbolic link to) mashlib, and nothing else."""
@@ -364,7 +377,7 @@ def test_include():
             foo()
         ]]]
     """
-    with open('included-dummy.mash', 'w') as output:
+    with open('included-dummy.mash', 'w', encoding='utf-8') as output:
         print(included, file=output)
 
     engage_string(code)
@@ -377,6 +390,7 @@ def test_mashlib_shell1():
             shell('ls /dev')
         ]]]
     """
+    os.system('pwd; ls -l')
     engage_string(code)
 
 def test_mashlib_shell2():
@@ -389,7 +403,6 @@ def test_mashlib_shell2():
     """
     root = tree_from_string(code, 'dummy.mash')
     with pytest.raises(subprocess.CalledProcessError):
-        os.system('pwd; ls -l')
         run_tree(root)
 
 def test_mashlib_shell3():

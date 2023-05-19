@@ -2,7 +2,7 @@
 set -e
 if [ $# -eq 0 ]
 then
-    pylint *.py || true
+    pylint -j0 *.py || true
     coverage run --omit=/usr*,/opt*,*dummy* -m pytest
     ./coverage-report
 else
