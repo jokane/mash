@@ -2,10 +2,17 @@
 # vim: set ft=python :
 
 import concurrent.futures
-import shutil
-import resource
-import subprocess
 import os
+import resource
+import shutil
+import subprocess
+import sys
+import re
+import filecmp
+import glob
+import hashlib
+
+
 from exceptiongroup import ExceptionGroup
 
 # A library of "standard" functions that provide many of the basic operations
@@ -35,6 +42,47 @@ if not mashlib_initialized:
     # A list of futures for jobs that have been submitted.
     job_futures = []
 
+    # This is the directory where started.
+    original_directory = os.getcwd()
+    sys.path.append(original_directory)
+
+    # This is the directory where we will do all of our work, execute commands,
+    # etc.  This will be the current directory most of the time.
+    build_directory = os.path.join(original_directory, ".mash")
+    sys.path.append(build_directory)
+
+    # This directory has things built in previous runs.  If nothing has
+    # changed, then we can just copy things over from there instead of
+    # re-building them.
+    archive_directory = os.path.join(original_directory, ".mash-archive")
+
+    # This is the directory that should contain the completed output files.
+    keep_directory = original_directory
+
+    # This is a list of places we should search when importing a new file.
+    import_search_directories = [original_directory, ]
+
+    # Move anything from the existing build directory to the archive directory.
+    if os.path.exists(build_directory):
+        for file_name in os.listdir(build_directory):
+          if not os.path.exists(archive_directory):
+              os.makedirs(archive_directory)
+          full_file_name = os.path.join(build_directory, file_name)
+          full_file_name_archive = os.path.join(archive_directory, file_name)
+          if os.path.isdir(full_file_name_archive):
+              shutil.rmtree(full_file_name_archive)
+          #print("%s --> %s" % (full_file_name, archive_directory))
+          shutil.move(full_file_name, os.path.join(archive_directory, file_name))
+
+
+
+    # Make sure we have a build directory and that it's the current/working
+    # directory.
+    if not os.path.exists(build_directory):
+        #print("Creating", build_directory)
+        os.makedirs(build_directory)
+    os.chdir(build_directory)
+
 def check_for_executable(exe):
     """Check whether some executable with the given name exists in the path.
     If it does not exist, complain."""
@@ -51,7 +99,6 @@ def shell(command, stdin=None, check=True):
     global job_executor
     
     if job_executor is None:
-        print(f"Starting job executor with a maximum of {max_jobs} jobs.")
         job_executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_jobs)
 
     if check:
@@ -87,7 +134,7 @@ def at_end():
         except Exception as exception:
             exceptions.append(exception)
 
-    # Report any exceptions that # occured.
+    # Report any exceptions that occured.
     if len(exceptions) == 1:
         raise exceptions[0]
     elif len(exceptions) > 1:

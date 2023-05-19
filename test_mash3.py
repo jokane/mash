@@ -71,7 +71,11 @@ def run_tests_from_pattern(): #pragma nocover
 
 @contextlib.contextmanager
 def engage_string(code, files=None):
-    with temporary_current_directory(linked_files=['mashlib.mash']):
+    test_script_dir = os.path.dirname(os.path.abspath(__file__))
+    linked_files = ['mashlib.mash']
+    linked_files = map(lambda x: os.path.join(test_script_dir, x), linked_files)
+
+    with temporary_current_directory(linked_files):
         filename = 'dummy.mash'
         with open(filename, 'w', encoding='utf-8') as output_file:
             print(code, file=output_file)
@@ -89,6 +93,10 @@ def engage_string(code, files=None):
         finally:
             pass
 
+@pytest.fixture(autouse=True)
+def start_in_test_directory():
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    yield
 
 ################################################################################
 
@@ -387,7 +395,7 @@ def test_mashlib_shell2():
     code = """
         [[[
             [[[ include mashlib.mash ]]]
-            result = shell('ls foobar')
+            shell('ls foobar')
         ]]]
     """
     root = tree_from_string(code, 'dummy.mash')
