@@ -52,10 +52,8 @@ def temporary_current_directory(linked_files=None):
             finally:
                 pass
 
-def run_tests_from_pattern(): #pragma nocover
-    # If we're run as a script, just execute all of the tests.  Or, if a
-    # command line argument is given, execute only the tests containing that
-    # pattern.
+def run_tests_from_pattern(pattern): #pragma nocover
+    # Execute all tests whose names containing the pattern.
     pattern = ''
     try:
         pattern = sys.argv[1]
@@ -517,4 +515,4 @@ def test_build_dir_created():
     engage_string(code)
 
 if __name__ == '__main__':  #pragma: nocover
-    run_tests_from_pattern()
+    run_tests_from_pattern(sys.argv[1])

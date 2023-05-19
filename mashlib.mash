@@ -17,7 +17,7 @@ from exceptiongroup import ExceptionGroup
 
 # A library of "standard" functions that provide many of the basic operations
 # that one might want to do on a mash frame.  Most mash documents will include
-# this near the start. 
+# this near the start.
 
 # First, some initialization.  This should only happen once.
 try:
