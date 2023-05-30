@@ -149,6 +149,7 @@ class Frame(FrameTreeNode):
         super().__init__(address, parent)
         self.children = []
         self.separated = False
+        self.text = None
 
     def as_indented_string(self, indent_level=0):
         r = ''
@@ -168,9 +169,19 @@ class Frame(FrameTreeNode):
         # Execute all of the child frames.
         stats += self.execute_children(variables, True)
 
+        # Reap the text from each of the text children into one place, removing
+        # the TextLeaves as we go.
+        new_children = []
+        self.text = ''
+        for child in self.children:
+            if isinstance(child, TextLeaf):
+                self.text += child.content
+            else:
+                new_children.append(child)
+        self.children = new_children
 
-        # Child frames are done.  Our child list should now be just leaves.
-        # Execute each of them.
+        # Child frames are done.  Our child list should now be just code
+        # leaves.  Execute each of them.
         stats += self.execute_children(variables, False)
 
         # All done.
@@ -222,6 +233,10 @@ class CodeLeaf(FrameTreeLeaf):
         # Shift so that the line numbers in any exceptions match the actual
         # source address.
         source = ('\n'*(self.address.lineno-1)) + source
+
+        # Give the code access to the frame we are executing in.  (...not to
+        # this actual object, which is just a CodeLeaf contained in a Frame.)
+        variables['self'] = self.parent
 
         # Run the stuff.
         code_obj = compile(source, self.address.filename, 'exec')

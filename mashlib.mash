@@ -6,6 +6,7 @@ start."""
 # vim: set ft=python :
 # pylint: disable=invalid-name
 # pylint: disable=global-statement
+# pylint: disable=undefined-variable
 
 
 import concurrent.futures
@@ -122,6 +123,46 @@ def shell(command, stdin=None, check=True):
 
     future = job_executor.submit(run_job)
     job_futures.append(future)
+
+def save(target, contents=None):
+    """Ensure that the given text (default: current contents of this frame)
+    exist in the build directory as a file with the given name.  Use an old
+    copy from the archive directory if possible."""
+
+    # Use the current frame text by default.
+    if contents is None:
+        contents = self.text
+
+    # Are we dealing with binary data or text?
+    binary = hasattr(contents, 'decode')
+    if binary:
+        bin_mode_flag = 'b'
+    else:
+        bin_mode_flag = ''
+
+    # Check for an identically-named, identical-contents file in the archive
+    # directory.
+    archive_name = os.path.join(archive_directory, target)
+    try:
+        with open(archive_name, 'r' + bin_mode_flag) as input_file:
+            existing_contents = input_file.read()
+        exists_already = (existing_contents == contents)
+    except IOError:
+        exists_already = False
+
+    if exists_already:
+        # We have this exact file in the archive directory.  Copy it instead of
+        # saving directly.  This keeps the timestamp intact, which can help us
+        # tell elsewhere if things need to be rebuilt.
+        try:
+            shutil.copy2(archive_name, target)
+        except shutil.SameFileError:
+            pass
+
+    else:
+        # We don't have a file like this anywhere.  Actually save it.
+        with open(target, 'w'+bin_mode_flag)as output_file:
+            output_file.write(contents)
 
 def at_end():
     """Executed automatically at the end of the run.  Finishes outstanding jobs

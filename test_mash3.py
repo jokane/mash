@@ -33,7 +33,6 @@ def temporarily_changed_directory(directory):
     finally:
         os.chdir(previous_current_directory)
 
-
 @contextlib.contextmanager
 def temporary_current_directory(linked_files=None):
     """Create a context in which the current directory is a new temporary
@@ -504,7 +503,6 @@ def test_build_dir_created():
     assert os.path.isdir('.mash/world')
     assert not os.path.exists('.mash-archive')
 
-
     # A second run creates the archive and moves things into it.
     engage_string(code)
     assert os.path.isdir('.mash-archive')
@@ -513,6 +511,21 @@ def test_build_dir_created():
 
     # A third run will need to rmtree in the archive.
     engage_string(code)
+
+def test_save():
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[
+            self.text = self.text.strip()
+            save('hello.txt')
+        |||
+            hello, world!
+        ]]]
+    """
+    engage_string(code)
+    assert os.path.isfile('.mash/hello.txt')
+    os.system('cat .mash/hello.txt')
+
 
 if __name__ == '__main__':  #pragma: nocover
     run_tests_from_pattern(sys.argv[1])
