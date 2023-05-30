@@ -448,6 +448,26 @@ def test_mashlib_shell6():
     with pytest.raises(ValueError):
         engage_string(code)
 
+def test_mashlib_shell_wait():
+    # Events are set.  Using a string for provides is handled as a single
+    # thing, instead of iterating over characters.  Calling wait_for allows
+    # the process to complete.
+    code = """
+        [[[
+            [[[ include mashlib.mash ]]]
+            import os
+            shell('sleep 1; ls > files.txt', provides='files.txt')
+            assert not os.path.isfile('files.txt')
+            wait_for('files.txt')
+            assert os.path.isfile('files.txt')
+        ]]]
+    """
+    variables = {}
+    root = tree_from_string(code, 'dummy.mash')
+    root.execute(variables)
+    assert len(list(variables['job_resource_events'])) == 1
+    assert 'files.txt' in variables['job_resource_events']
+
 def test_subprocess_max_jobs():
     # The max_jobs setting actually limits the number of parallel shell jobs
     # running at a time.
@@ -512,7 +532,7 @@ def test_build_dir_created():
     # A third run will need to rmtree in the archive.
     engage_string(code)
 
-def test_save():
+def test_save1():
     code = """
         [[[ include mashlib.mash ]]]
         [[[

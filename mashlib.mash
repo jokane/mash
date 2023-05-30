@@ -15,6 +15,7 @@ import resource
 import shutil
 import subprocess
 import sys
+import threading
 
 
 from exceptiongroup import ExceptionGroup
@@ -43,12 +44,16 @@ if not mashlib_initialized:
     # A list of futures for jobs that have been submitted.
     job_futures = []
 
+    # A dictionary mapping resource names to threading.Event objects.
+    # Created atthe start of a job, set at job completion.
+    job_resource_events = {}
+
     # This is the directory where started.
     original_directory = os.getcwd()
     sys.path.append(original_directory)
 
-    # This is the directory where we will do all of our work, execute commands,
-    # etc.  This will be the current directory most of the time.
+    # This is the directory where we will do all of our work, execute
+    # commands, etc.  This will be the current directory most of the time.
     build_directory = os.path.join(original_directory, ".mash")
     sys.path.append(build_directory)
 
@@ -89,12 +94,14 @@ def check_for_executable(exe):
         raise ValueError(f'Executable {exe} not found in path.')
     executables_checked.add(exe)
 
-def shell(command, stdin=None, check=True):
-    """Execute the given command in a shell.  Raise
+def shell(command, stdin=None, check=True, provides=None):
+    """Execute the given command asyncronously in a shell.  Raise
     subprocess.CalledProcessError if the command gives a non-zero return code.
-    Return the CompletedProcess object, which has stdout and stderr attributes.
-    In addition, this object has attributes tacked on to it showing the user
-    time and system time consumed, as reported by getrusage."""
+    Return a future, which when completed results in CompletedProcess object,
+    which has stdout and stderr attributes.  In addition, this object has
+    attributes tacked on to it showing the user time and system time consumed,
+    as reported by getrusage."""
+
     global job_executor
 
     if job_executor is None:
@@ -104,6 +111,14 @@ def shell(command, stdin=None, check=True):
         check_for_executable(command.split(' ')[0])
 
     print("  ", command)
+
+    if provides is None:
+        provides = []
+    if isinstance(provides, str):
+        provides = [ provides ]
+
+    events = { res:threading.Event() for res in provides }
+    job_resource_events.update(events)
 
     def run_job():
         usage_before = resource.getrusage(resource.RUSAGE_CHILDREN)
@@ -119,10 +134,20 @@ def shell(command, stdin=None, check=True):
         completed_process.user_time = usage_after.ru_utime - usage_before.ru_utime
         completed_process.sys_time = usage_after.ru_stime - usage_before.ru_stime
 
+        for _, event in events.items():
+            event.set()
+
         return completed_process
 
     future = job_executor.submit(run_job)
     job_futures.append(future)
+
+def wait_for(resources):
+    """Wait for shell process creating the named resource to complete."""
+    if isinstance(resources, str):
+        resources = [ resources ]
+    for res in resources:
+        job_resource_events[res].wait()
 
 def save(target, contents=None):
     """Ensure that the given text (default: current contents of this frame)
@@ -151,9 +176,9 @@ def save(target, contents=None):
         exists_already = False
 
     if exists_already:
-        # We have this exact file in the archive directory.  Copy it instead of
-        # saving directly.  This keeps the timestamp intact, which can help us
-        # tell elsewhere if things need to be rebuilt.
+        # We have this exact file in the archive directory.  Copy it instead
+        # of saving directly.  This keeps the timestamp intact, which can
+        # help us tell elsewhere if things need to be rebuilt.
         try:
             shutil.copy2(archive_name, target)
         except shutil.SameFileError:
