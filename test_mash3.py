@@ -666,6 +666,25 @@ def test_recall7():
     """
     engage_string(code)
 
+def test_recall8():
+    # In-progress dependencies are waited for.
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[
+            shell('sleep 0.3; echo hello > 1.txt', provides='1.txt')
+            shell('sleep 0.1; echo world > 2.txt', provides='2.txt')
+
+            if x := recall('3.txt', '1.txt', '2.txt'):
+                shell('cat 1.txt 2.txt > 3.txt', provides=x)
+
+            wait_for('3.txt')
+            os.system('cat 3.txt')
+        ]]]
+    """
+    engage_string(code)
+
+
+
 
 if __name__ == '__main__':  #pragma: nocover
     run_tests_from_pattern(sys.argv[1])

@@ -147,7 +147,10 @@ def wait_for(resources):
     if isinstance(resources, str):
         resources = [ resources ]
     for res in resources:
-        job_resource_events[res].wait()
+        event = job_resource_events[res]
+        if not event.is_set():
+            print(f'[waiting for {res}]')
+        event.wait()
 
 def save(target, contents=None):
     """Ensure that the given text (default: current contents of this frame)
