@@ -9,6 +9,7 @@ start."""
 # pylint: disable=undefined-variable
 # pylint: disable=too-many-branches
 # pylint: disable=no-else-return
+# pylint: disable=no-else-continue
 
 
 import concurrent.futures
@@ -272,6 +273,55 @@ def read(fname):
     """Read the given file, appending to the content of the current frame."""
     with open(fname, 'r', encoding='utf-8') as it:
         self.content += it.read()
+
+def imprt(*fnames, target=None, conditional=False):
+    """Copy one or more files to the build directory, looking in the
+    directories listed in import_search_directories to find them.  If target is
+    given, the file (of which there must be only one) will be renamed as it is
+    imported.  If conditional is True, don't complain if the files don't
+    exist."""
+
+    # Sanity check.
+    if target and len(fnames) > 1:
+        raise ValueError("Called imprt() with both multiple inputs and a target.")
+
+    # Import each thing, one at a time.
+    for fname in fnames:
+        # Figure out the source filename.
+        fr = None
+        for directory in import_search_directories:
+            x = os.path.join(directory, fname)
+            if os.path.exists(x):
+                fr = x
+                break
+
+        # If we didn't find it, maybe complain and definitely give up on this
+        # one.
+        if fr is None:
+            if conditional:
+                continue
+            else:
+                raise FileNotFoundError(f"Trying to import {fname} but could not "
+                                         "find it in any of these places:\n"
+                                         + '\n'.join(import_search_directories))
+
+        # Figure out the destination filename.
+        if not target:
+            dest = os.path.basename(fname)
+        else:
+            dest = target
+        to = os.path.join(build_directory, dest)
+
+        # Does this file exist already?  If not, copy it in.
+        if not os.path.isfile(to) or not filecmp.cmp(fr, to, False):
+            print(fr)
+            shutil.copy2(fr, to)
+
+    # Return the name of the (last) imported file.
+    if len(fnames) > 0:
+        return os.path.basename(fnames[-1])
+    else:
+        return None
 
 def at_end():
     """Executed automatically at the end of the run.  Finishes outstanding jobs

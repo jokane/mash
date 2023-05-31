@@ -778,7 +778,57 @@ def test_read():
     with open('hello_again.txt', encoding='utf-8') as it:
         assert it.read().strip() == 'hello world'
 
+def test_imprt1():
+    # Imported files are actually imported to the build directory.
+    os.system('echo hello > hello.txt')
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[ imprt('hello.txt') ]]]
+    """
+    engage_string(code)
+    assert os.path.isfile('.mash/hello.txt')
 
+def test_imprt2():
+    # Fail if we try to rename-on-import more than one file.
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[ imprt('1', '2', target='3') ]]]
+    """
+    with pytest.raises(ValueError):
+        engage_string(code)
+
+def test_imprt3():
+    # Importing something that doesn't exist might fail or might be ignored.
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[ imprt('1', conditional=%s) ]]]
+    """
+    engage_string(code % 'True') # pylint:disable=consider-using-f-string
+
+    with pytest.raises(FileNotFoundError):
+        engage_string(code % 'False') # pylint:disable=consider-using-f-string
+
+def test_imprt4():
+    # Rename-on-import happens correctly.
+    os.system('echo hello > 1')
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[ imprt('1', target='2') ]]]
+    """
+    engage_string(code)
+    assert os.path.exists('.mash/2')
+    assert not os.path.exists('.mash/1')
+
+def test_imprt5():
+    # Return None if there's nothing to import.
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[ 
+            x = imprt()
+            assert x is None
+        ]]]
+    """
+    engage_string(code)
 
 if __name__ == '__main__':  #pragma: nocover
     run_tests_from_pattern(sys.argv[1])
