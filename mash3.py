@@ -149,7 +149,7 @@ class Frame(FrameTreeNode):
         super().__init__(address, parent)
         self.children = []
         self.separated = False
-        self.text = None
+        self.content = None
 
     def as_indented_string(self, indent_level=0):
         r = ''
@@ -172,10 +172,10 @@ class Frame(FrameTreeNode):
         # Reap the text from each of the text children into one place, removing
         # the TextLeaves as we go.
         new_children = []
-        self.text = ''
+        self.content = ''
         for child in self.children:
             if isinstance(child, TextLeaf):
-                self.text += child.content
+                self.content += child.content
             else:
                 new_children.append(child)
         self.children = new_children

@@ -536,7 +536,7 @@ def test_save1():
     code = """
         [[[ include mashlib.mash ]]]
         [[[
-            self.text = self.text.strip()
+            self.content = self.content.strip()
             save('hello.txt')
         |||
             hello, world!
@@ -566,7 +566,7 @@ def test_save3():
     code = """
         [[[ include mashlib.mash ]]]
         [[[
-            self.text = self.text.strip()
+            self.content = self.content.strip()
             os.mkdir(archive_directory)
             save(archive_directory + '/hello.txt')
             save(archive_directory + '/hello.txt')
@@ -758,6 +758,26 @@ def test_keep6():
     """
     with pytest.raises(NotImplementedError):
         engage_string(code)
+
+def test_read():
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[
+            save('hello.txt')
+        |||
+            hello world
+        ]]]
+
+        [[[
+            read('hello.txt')
+            save('hello_again.txt')
+            keep('hello_again.txt')
+        ]]]
+    """
+    engage_string(code)
+    with open('hello_again.txt', encoding='utf-8') as it:
+        assert it.read().strip() == 'hello world'
+
 
 
 if __name__ == '__main__':  #pragma: nocover

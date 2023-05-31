@@ -159,7 +159,7 @@ def save(target, contents=None):
 
     # Use the current frame text by default.
     if contents is None:
-        contents = self.text
+        contents = self.content
 
     # Are we dealing with binary data or text?
     binary = hasattr(contents, 'decode')
@@ -266,7 +266,12 @@ def keep(file_to_keep):
         raise FileNotFoundError(f"Cannot keep {file_to_keep} because it does not exist.")
     else:
         raise NotImplementedError(f"Don't know how to keep {file_to_keep}, "
-                          "which is neither file nor directory.")
+                                   "which is neither file nor directory.")
+
+def read(fname):
+    """Read the given file, appending to the content of the current frame."""
+    with open(fname, 'r', encoding='utf-8') as it:
+        self.content += it.read()
 
 def at_end():
     """Executed automatically at the end of the run.  Finishes outstanding jobs
