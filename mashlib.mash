@@ -244,6 +244,30 @@ def recall(target, *sources):
     else:
         return target
 
+def keep(file_to_keep):
+    """Copy a file or directory from the working directory to
+    the keep directory."""
+    if not os.path.isabs(keep_directory):
+        raise ValueError(f'Keep directory ({keep_directory}) is a relative path. '
+                        f'This would be interpreted relative to the build directory ',
+                        f'({build_directory}).  This almost certainly not what you want. '
+                        f'Use an absolute path for keep_directory instead.')
+
+    if not os.path.exists(keep_directory):
+        os.makedirs(keep_directory)
+    if os.path.isfile(file_to_keep):
+        shutil.copy2(file_to_keep, keep_directory)
+    elif os.path.isdir(file_to_keep):
+        target = os.path.join(keep_directory, file_to_keep)
+        if os.path.exists(target):
+            shutil.rmtree(target)
+        shutil.copytree(file_to_keep, target)
+    elif not os.path.exists(file_to_keep):
+        raise FileNotFoundError(f"Cannot keep {file_to_keep} because it does not exist.")
+    else:
+        raise NotImplementedError(f"Don't know how to keep {file_to_keep}, "
+                          "which is neither file nor directory.")
+
 def at_end():
     """Executed automatically at the end of the run.  Finishes outstanding jobs
     and raises and exceptions that we've been saving up."""

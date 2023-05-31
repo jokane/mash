@@ -683,7 +683,81 @@ def test_recall8():
     """
     engage_string(code)
 
+def test_keep1():
+    # Keeping a file.
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[
+            os.system('touch 1.txt')
+            keep('1.txt')
+        ]]]
+    """
+    engage_string(code)
 
+
+def test_keep2():
+    # Error from relative path for keep_directory.
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[
+            keep_directory = 'keep'
+            os.system('touch 1.txt')
+            keep('1.txt')
+        ]]]
+    """
+    with pytest.raises(ValueError):
+        engage_string(code)
+
+def test_keep3():
+    # Create keep directory if needed.
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[
+            keep_directory = os.path.join(original_directory, 'keep')
+            os.system('touch 1.txt')
+            keep('1.txt')
+        ]]]
+    """
+    engage_string(code)
+    assert os.path.exists('keep/1.txt')
+
+def test_keep4():
+    # Keep a directory, replacing an existing version if needed.
+    os.mkdir('stuff')
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[
+            os.mkdir('stuff')
+            os.system('touch stuff/1.txt')
+            keep('stuff')
+        ]]]
+    """
+    engage_string(code)
+    assert os.path.isdir('stuff')
+    assert os.path.isfile('stuff/1.txt')
+
+def test_keep5():
+    # Try and fail to keep something that does not exist.
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[
+            keep('stuff')
+        ]]]
+    """
+    with pytest.raises(FileNotFoundError):
+        engage_string(code)
+
+def test_keep6():
+    # If we somehow manage to get something that's neither file nor directory,
+    # fail.
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[
+            keep('/dev/null')
+        ]]]
+    """
+    with pytest.raises(NotImplementedError):
+        engage_string(code)
 
 
 if __name__ == '__main__':  #pragma: nocover
