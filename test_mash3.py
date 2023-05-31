@@ -85,7 +85,6 @@ def engage_string(code):
     with temporarily_changed_directory('.'):
         engage(['mash3', filename])
 
-
 @pytest.fixture(autouse=True)
 def fixture_start_in_temp_directory():
     yield from start_in_temp_directory()
@@ -573,6 +572,96 @@ def test_save3():
             save(archive_directory + '/hello.txt')
         |||
             hello, world!
+        ]]]
+    """
+    engage_string(code)
+
+def test_recall1():
+    # Recalled files that exist are copied in.
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[
+            os.mkdir(archive_directory)
+            os.system(f'touch {archive_directory}/test.txt')
+            assert recall('test.txt') is None
+        ]]]
+    """
+    engage_string(code)
+
+def test_recall2():
+    # Recalled files that do not exist are not copied in.
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[
+            assert recall('test.txt') == 'test.txt'
+        ]]]
+    """
+    engage_string(code)
+
+def test_recall3():
+    # Missing dependencies are noticed and complained about.
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[
+            os.mkdir(archive_directory)
+            os.system(f'touch {archive_directory}/test.txt')
+            recall('test.txt', 'dep.txt')
+        ]]]
+    """
+    with pytest.raises(FileNotFoundError):
+        engage_string(code)
+
+def test_recall4():
+    # Target older than dependencies.
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[
+            os.mkdir(archive_directory)
+            os.system(f'touch -d 1960-10-13 {archive_directory}/test.txt')
+            os.system(f'touch -d 1960-10-14 dep.txt')
+            assert recall('test.txt', 'dep.txt') == 'test.txt'
+        ]]]
+    """
+    engage_string(code)
+
+def test_recall5():
+    # Target newer than dependencies.
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[
+            os.mkdir(archive_directory)
+            os.system(f'touch -d 1960-10-14 {archive_directory}/test.txt')
+            os.system(f'touch -d 1960-10-13 dep.txt')
+            assert recall('test.txt', 'dep.txt') is None
+        ]]]
+    """
+    engage_string(code)
+
+def test_recall6():
+    # Target is a directory.
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[
+            os.mkdir(archive_directory)
+            os.mkdir(archive_directory + '/test')
+            os.system(f'touch -d 1960-10-13 {archive_directory}/test')
+            os.system(f'touch -d 1960-10-13 dep.txt')
+            assert recall('test') is None
+        ]]]
+    """
+    engage_string(code)
+
+def test_recall7():
+    # Target is a directory that already exists.
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[
+            os.mkdir(archive_directory)
+            os.mkdir(archive_directory + '/test')
+            os.mkdir('test')
+            os.system(f'touch -d 1960-10-13 {archive_directory}/test')
+            os.system(f'touch -d 1960-10-13 dep.txt')
+            assert recall('test') is None
         ]]]
     """
     engage_string(code)

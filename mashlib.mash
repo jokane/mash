@@ -7,6 +7,8 @@ start."""
 # pylint: disable=invalid-name
 # pylint: disable=global-statement
 # pylint: disable=undefined-variable
+# pylint: disable=too-many-branches
+# pylint: disable=no-else-return
 
 
 import concurrent.futures
@@ -77,13 +79,11 @@ if not mashlib_initialized:
             full_file_name_archive = os.path.join(archive_directory, file_name)
             if os.path.isdir(full_file_name_archive):
                 shutil.rmtree(full_file_name_archive)
-            #print("%s --> %s" % (full_file_name, archive_directory))
             shutil.move(full_file_name, os.path.join(archive_directory, file_name))
 
     # Make sure we have a build directory and that it's the current/working
     # directory.
     if not os.path.exists(build_directory):
-        #print("Creating", build_directory)
         os.makedirs(build_directory)
     os.chdir(build_directory)
 
@@ -175,8 +175,6 @@ def save(target, contents=None):
     except IOError:
         exists_already = False
 
-    print(archive_name, target, exists_already)
-
     if exists_already:
         # We have this exact file in the archive directory.  Copy it instead
         # of saving directly.  This keeps the timestamp intact, which can
@@ -190,6 +188,54 @@ def save(target, contents=None):
         # We don't have a file like this anywhere.  Actually save it.
         with open(target, 'w'+bin_mode_flag) as output_file:
             output_file.write(contents)
+
+def recall(target, *sources):
+    """If any of the sources are being built by an active shell job, wait
+    until that shell job finishes.  Then check whether the given target file
+    exists in the archive directory, and if so, if it's newer than all of the
+    given sources.  If so, copy it over and return the target.  If not, do
+    nothing and return None."""
+
+    archive_target = os.path.join(archive_directory, target)
+
+    ok = True
+
+    if not os.path.exists(archive_target):
+        print(f"({target}): [does not exist]", end='')
+        ok = False
+        target_time = None
+    else:
+        print(f"{target}:", end='')
+        target_time = os.path.getmtime(archive_target)
+        if sources:
+            sources = list(dict.fromkeys(sources))
+            for source in sources:
+                try:
+                    source_time = os.path.getmtime(source)
+                except FileNotFoundError as fnfe:
+                    raise FileNotFoundError(f'While checking dependencies for '
+                                    f'{target}, could not find file {source}. '
+                                    f'Full dependency list is {sources}.') from fnfe
+                if target_time is not None and source_time > target_time:
+                    print(f" ({source})", end='')
+                    ok = False
+                else:
+                    print(f" {source}", end='')
+        else:
+            print(" [no sources]")
+
+    print()
+
+    if ok:
+        if os.path.isfile(archive_target):
+            shutil.copy2(archive_target, build_directory)
+        else:
+            if os.path.exists(target):
+                shutil.rmtree(target)
+            shutil.copytree(archive_target, os.path.join(build_directory, target))
+        return None
+    else:
+        return target
 
 def at_end():
     """Executed automatically at the end of the run.  Finishes outstanding jobs
