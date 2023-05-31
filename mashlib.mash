@@ -200,6 +200,10 @@ def recall(target, *sources):
 
     ok = True
 
+    for source in sources:
+        if source in job_resource_events:
+            wait_for(source)
+
     if not os.path.exists(archive_target):
         print(f"({target}): [does not exist]", end='')
         ok = False
