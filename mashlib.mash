@@ -175,10 +175,12 @@ def save(target, contents=None):
     except IOError:
         exists_already = False
 
+    print(archive_name, target, exists_already)
+
     if exists_already:
         # We have this exact file in the archive directory.  Copy it instead
         # of saving directly.  This keeps the timestamp intact, which can
-        # help us tell elsewhere if things need to be rebuilt.
+        # help us elsewhere to tell if things need to be rebuilt.
         try:
             shutil.copy2(archive_name, target)
         except shutil.SameFileError:
@@ -186,7 +188,7 @@ def save(target, contents=None):
 
     else:
         # We don't have a file like this anywhere.  Actually save it.
-        with open(target, 'w'+bin_mode_flag)as output_file:
+        with open(target, 'w'+bin_mode_flag) as output_file:
             output_file.write(contents)
 
 def at_end():

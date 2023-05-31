@@ -533,6 +533,7 @@ def test_build_dir_created():
     engage_string(code)
 
 def test_save1():
+    # File is created.
     code = """
         [[[ include mashlib.mash ]]]
         [[[
@@ -545,6 +546,36 @@ def test_save1():
     engage_string(code)
     assert os.path.isfile('.mash/hello.txt')
     os.system('cat .mash/hello.txt')
+
+    # Second time through, the file should be found in the archive instead.
+    engage_string(code)
+
+def test_save2():
+    # Binary mode and explicitly specified contents.
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[
+            save('hello.png', contents=b'abcdefg\x45')
+        ]]]
+    """
+    engage_string(code)
+    assert os.path.isfile('.mash/hello.png')
+    os.system('cat .mash/hello.png')
+
+def test_save3():
+    # Same file errors are caught and ignored.
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[
+            self.text = self.text.strip()
+            os.mkdir(archive_directory)
+            save(archive_directory + '/hello.txt')
+            save(archive_directory + '/hello.txt')
+        |||
+            hello, world!
+        ]]]
+    """
+    engage_string(code)
 
 
 if __name__ == '__main__':  #pragma: nocover
