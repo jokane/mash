@@ -830,5 +830,35 @@ def test_imprt5():
     """
     engage_string(code)
 
+def test_anonymous_name():
+    # Different content gets a different anonymous name.
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[ 
+            x = anonymous_name()
+        |||
+            a b c
+        ]]] 
+        [[[ 
+            y = anonymous_name()
+        |||
+            d e f
+        ]]]
+        [[[ 
+            z = anonymous_name()
+        |||
+            d e f
+        ]]]
+
+        [[[
+            print(x)
+            print(y)
+            print(z)
+            assert x != y
+            assert y == z
+        ]]]
+    """
+    engage_string(code)
+
 if __name__ == '__main__':  #pragma: nocover
     run_tests_from_pattern(sys.argv[1])

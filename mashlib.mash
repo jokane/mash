@@ -13,6 +13,7 @@ start."""
 
 
 import concurrent.futures
+import hashlib
 import os
 import resource
 import shutil
@@ -322,6 +323,14 @@ def imprt(*fnames, target=None, conditional=False):
         return os.path.basename(fnames[-1])
     else:
         return None
+
+def anonymous_name(content=None):
+    """Return an anonymous name constructed by hashing the given content or,
+    by default, the contents of the current frame."""
+    if content is None:
+        content = self.content
+    return hashlib.sha1(content.encode('utf-8')).hexdigest()[:7]
+
 
 def at_end():
     """Executed automatically at the end of the run.  Finishes outstanding jobs
