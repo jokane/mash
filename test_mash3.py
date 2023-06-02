@@ -385,7 +385,8 @@ def test_mashlib_shell1():
     code = """
         [[[
             [[[ include mashlib.mash ]]]
-            shell('ls /dev')
+            x = shell('ls /dev')
+            assert isinstance(x, concurrent.futures.Future)
         ]]]
     """
     engage_string(code)

@@ -143,6 +143,7 @@ def shell(command, stdin=None, check=True, provides=None):
 
     future = job_executor.submit(run_job)
     job_futures.append(future)
+    return future
 
 def wait_for(resources):
     """Wait for shell process creating the named resource to complete."""
@@ -330,7 +331,6 @@ def anonymous_name(content=None):
     if content is None:
         content = self.content
     return hashlib.sha1(content.encode('utf-8')).hexdigest()[:7]
-
 
 def at_end():
     """Executed automatically at the end of the run.  Finishes outstanding jobs
