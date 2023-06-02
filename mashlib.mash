@@ -21,7 +21,6 @@ import resource
 import shutil
 import subprocess
 import sys
-import threading
 
 
 from exceptiongroup import ExceptionGroup
@@ -39,10 +38,7 @@ if not mashlib_initialized:
     # These are usually set in the mash core before each chunk of code is
     # executed.  Dummy values here help to appease pylint.
     self = None
-    try:
-        leaf
-    except NameError:
-        leaf = None
+    leaf = None
 
     # A list of executable names whose existence we have already verified.
     executables_checked = set()
@@ -55,12 +51,13 @@ if not mashlib_initialized:
     # give the client code time to change max_jobs.
     job_executor = None
 
-    # A list of futures for jobs that have been submitted.
-    job_futures = []
+    # A dictionary mapping resource names to futures of the processes that
+    # are working on them.
+    resource_futures = {}
 
-    # A dictionary mapping resource names to threading.Event objects.
-    # Created atthe start of a job, set at job completion.
-    job_resource_events = {}
+    # A list of *all* of the futures, even the ones with no associated
+    # resources.
+    all_futures = []
 
     # This is the directory where started.
     original_directory = os.getcwd()
@@ -108,11 +105,11 @@ def check_for_executable(exe):
 
 def shell(command, stdin=None, check=True, provides=None):
     """Execute the given command asyncronously in a shell.  Raise
-    subprocess.CalledProcessError if the command gives a non-zero return code.
-    Return a future, which when completed results in CompletedProcess object,
-    which has stdout and stderr attributes.  In addition, this object has
-    attributes tacked on to it showing the user time and system time consumed,
-    as reported by getrusage."""
+    subprocess.CalledProcessError if the command gives a non-zero return
+    code.  Return a future, which when completed results in
+    CompletedProcess object, which has stdout and stderr attributes.  In
+    addition, this object has attributes tacked on to it showing the user
+    time and system time consumed, as reported by getrusage."""
 
     global job_executor
 
@@ -129,9 +126,6 @@ def shell(command, stdin=None, check=True, provides=None):
     if isinstance(provides, str):
         provides = [ provides ]
 
-    events = { res:threading.Event() for res in provides }
-    job_resource_events.update(events)
-
     def run_job():
         usage_before = resource.getrusage(resource.RUSAGE_CHILDREN)
 
@@ -145,25 +139,20 @@ def shell(command, stdin=None, check=True, provides=None):
         usage_after = resource.getrusage(resource.RUSAGE_CHILDREN)
         completed_process.user_time = usage_after.ru_utime - usage_before.ru_utime
         completed_process.sys_time = usage_after.ru_stime - usage_before.ru_stime
-
-        for _, event in events.items():
-            event.set()
-
         return completed_process
 
     future = job_executor.submit(run_job)
-    job_futures.append(future)
+    for res in provides:
+        resource_futures[res] = future
+    all_futures.append(future)
     return future
 
-def wait_for(resources):
-    """Wait for shell process creating the named resource to complete."""
-    if isinstance(resources, str):
-        resources = [ resources ]
-    for res in resources:
-        event = job_resource_events[res]
-        if not event.is_set():
-            print(f'[waiting for {res}]')
-        event.wait()
+def wait_for(res):
+    """Wait for shell process creating the named resource to complete.
+    Return its CompletedProcess.  Or, if an exception occured in the
+    process, raise it."""
+    future = resource_futures[res]
+    return future.result()
 
 def save(target, contents=None):
     """Ensure that the given text (default: current contents of this frame)
@@ -217,7 +206,7 @@ def recall(target, *sources):
     ok = True
 
     for source in sources:
-        if source in job_resource_events:
+        if source in resource_futures:
             wait_for(source)
 
     if not os.path.exists(archive_target):
@@ -389,16 +378,21 @@ def ext(filename, extension):
     x, _ = os.path.splitext(filename)
     return f"{x}.{extension}"
 
-def push(_):
-    """Send text to the parent frame."""
+def push(text = None):
+    """Insert text, either the given argument or the contents
+    of the current frame, into the parent frame."""
+    if text is None:
+        text = self.content
+    self.result.append(TextLeaf(leaf.address, self.parent, text))
 
 
 def at_end():
-    """Executed automatically at the end of the run.  Finishes outstanding jobs
-    and raises and exceptions that we've been saving up."""
+    """Executed automatically at the end of the run.  Finishes outstanding
+    jobs and raises and exceptions that we've been saving up."""
     # Finish up any jobs that are still running.
     exceptions = []
-    for future in job_futures:
+    print(f'At end there are {len(all_futures)} futures.')
+    for future in all_futures:
         try:
             future.result()
         except Exception as exception:  #pylint: disable=broad-except

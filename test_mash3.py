@@ -304,7 +304,7 @@ def test_frame_execute3():
 
 def test_vars1():
     # Variables from child frames are visible to parents.
-    code = """
+    code = r"""
         [[[
             print(x)
             [[[ x = 3 ]]]
@@ -314,7 +314,7 @@ def test_vars1():
 
 def test_vars2():
     # Vars from later children replace vars from earlier children.
-    code = """
+    code = r"""
         [[[
             [[[
                 import time
@@ -335,7 +335,7 @@ def test_vars2():
 
 def test_restart_request1():
     # RestartRequest is visible from mash code.
-    code = """
+    code = r"""
         [[[
             raise RestartRequest
         ]]]
@@ -346,7 +346,7 @@ def test_restart_request1():
 
 def test_restart_request2():
     # RestartRequests are correctly handled.
-    code = """
+    code = r"""
         [[[
             import os
             if not os.path.exists('1'):
@@ -369,7 +369,7 @@ def test_include():
         ]]]
     """
 
-    code = """
+    code = r"""
         [[[
             [[[ include included-dummy.mash ]]]
             foo()
@@ -382,7 +382,7 @@ def test_include():
 
 def test_mashlib_shell1():
     # Shell commands run correctly.
-    code = """
+    code = r"""
         [[[
             [[[ include mashlib.mash ]]]
             x = shell('ls /dev')
@@ -393,7 +393,7 @@ def test_mashlib_shell1():
 
 def test_mashlib_shell2():
     # Broken commands raise exceptions.
-    code = """
+    code = r"""
         [[[
             [[[ include mashlib.mash ]]]
             shell('ls foobar')
@@ -405,7 +405,7 @@ def test_mashlib_shell2():
 
 def test_mashlib_shell3():
     # Those exceptions are caught and handled gracefully.
-    code = """
+    code = r"""
         [[[
             [[[ include mashlib.mash ]]]
             shell('ls foobar')
@@ -415,7 +415,7 @@ def test_mashlib_shell3():
 
 def test_mashlib_shell4():
     # Multiple broken commands raise an ExecptionGroup.
-    code = """
+    code = r"""
         [[[
             [[[ include mashlib.mash ]]]
             result = shell('ls foobar')
@@ -428,7 +428,7 @@ def test_mashlib_shell4():
 
 def test_mashlib_shell5():
     # ExceptionGroups are caught and reported gracefully.
-    code = """
+    code = r"""
         [[[
             [[[ include mashlib.mash ]]]
             result = shell('ls foobar')
@@ -439,7 +439,7 @@ def test_mashlib_shell5():
 
 def test_mashlib_shell6():
     # Missing executables are noticed.
-    code = """
+    code = r"""
         [[[
             [[[ include mashlib.mash ]]]
             shell('foobar')
@@ -452,7 +452,7 @@ def test_mashlib_shell_wait():
     # Events are set.  Using a string for provides is handled as a single
     # thing, instead of iterating over characters.  Calling wait_for allows
     # the process to complete.
-    code = """
+    code = r"""
         [[[
             [[[ include mashlib.mash ]]]
             import os
@@ -465,13 +465,12 @@ def test_mashlib_shell_wait():
     variables = {}
     root = tree_from_string(code, 'dummy.mash')
     root.execute(variables)
-    assert len(list(variables['job_resource_events'])) == 1
-    assert 'files.txt' in variables['job_resource_events']
+    assert list(variables['resource_futures']) == [ 'files.txt' ]
 
 def test_subprocess_max_jobs():
     # The max_jobs setting actually limits the number of parallel shell jobs
     # running at a time.
-    code = """
+    code = r"""
         [[[
             [[[ include mashlib.mash ]]]
             max_jobs = 2
@@ -499,7 +498,7 @@ def test_subprocess_max_jobs():
 
 def test_at_end():
     # Call to at_end() after full tree is executed.
-    code = """
+    code = r"""
         [[[
             def at_end():
                 raise ValueError
@@ -510,7 +509,7 @@ def test_at_end():
         run_tree(root)
 
 def test_build_dir_created():
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[ shell('touch hello') ]]] 
         [[[ shell('mkdir world') ]]] 
@@ -534,7 +533,7 @@ def test_build_dir_created():
 
 def test_save1():
     # File is created.
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[
             self.content = self.content.strip()
@@ -552,7 +551,7 @@ def test_save1():
 
 def test_save2():
     # Binary mode and explicitly specified contents.
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[
             save('hello.png', contents=b'abcdefg\x45')
@@ -564,7 +563,7 @@ def test_save2():
 
 def test_save3():
     # Same file errors are caught and ignored.
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[
             self.content = self.content.strip()
@@ -579,7 +578,7 @@ def test_save3():
 
 def test_recall1():
     # Recalled files that exist are copied in.
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[
             os.mkdir(archive_directory)
@@ -591,7 +590,7 @@ def test_recall1():
 
 def test_recall2():
     # Recalled files that do not exist are not copied in.
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[
             assert recall('test.txt') == 'test.txt'
@@ -601,7 +600,7 @@ def test_recall2():
 
 def test_recall3():
     # Missing dependencies are noticed and complained about.
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[
             os.mkdir(archive_directory)
@@ -614,7 +613,7 @@ def test_recall3():
 
 def test_recall4():
     # Target older than dependencies.
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[
             os.mkdir(archive_directory)
@@ -627,7 +626,7 @@ def test_recall4():
 
 def test_recall5():
     # Target newer than dependencies.
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[
             os.mkdir(archive_directory)
@@ -640,7 +639,7 @@ def test_recall5():
 
 def test_recall6():
     # Target is a directory.
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[
             os.mkdir(archive_directory)
@@ -654,7 +653,7 @@ def test_recall6():
 
 def test_recall7():
     # Target is a directory that already exists.
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[
             os.mkdir(archive_directory)
@@ -669,7 +668,7 @@ def test_recall7():
 
 def test_recall8():
     # In-progress dependencies are waited for.
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[
             shell('sleep 0.3; echo hello > 1.txt', provides='1.txt')
@@ -686,7 +685,7 @@ def test_recall8():
 
 def test_keep1():
     # Keeping a file.
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[
             os.system('touch 1.txt')
@@ -698,7 +697,7 @@ def test_keep1():
 
 def test_keep2():
     # Error from relative path for keep_directory.
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[
             keep_directory = 'keep'
@@ -711,7 +710,7 @@ def test_keep2():
 
 def test_keep3():
     # Create keep directory if needed.
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[
             keep_directory = os.path.join(original_directory, 'keep')
@@ -725,7 +724,7 @@ def test_keep3():
 def test_keep4():
     # Keep a directory, replacing an existing version if needed.
     os.mkdir('stuff')
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[
             os.mkdir('stuff')
@@ -739,7 +738,7 @@ def test_keep4():
 
 def test_keep5():
     # Try and fail to keep something that does not exist.
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[
             keep('stuff')
@@ -751,7 +750,7 @@ def test_keep5():
 def test_keep6():
     # If we somehow manage to get something that's neither file nor directory,
     # fail.
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[
             keep('/dev/null')
@@ -761,7 +760,7 @@ def test_keep6():
         engage_string(code)
 
 def test_read():
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[
             save('hello.txt')
@@ -782,7 +781,7 @@ def test_read():
 def test_imprt1():
     # Imported files are actually imported to the build directory.
     os.system('echo hello > hello.txt')
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[ imprt('hello.txt') ]]]
     """
@@ -791,7 +790,7 @@ def test_imprt1():
 
 def test_imprt2():
     # Fail if we try to rename-on-import more than one file.
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[ imprt('1', '2', target='3') ]]]
     """
@@ -800,7 +799,7 @@ def test_imprt2():
 
 def test_imprt3():
     # Importing something that doesn't exist might fail or might be ignored.
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[ imprt('1', conditional=%s) ]]]
     """
@@ -812,7 +811,7 @@ def test_imprt3():
 def test_imprt4():
     # Rename-on-import happens correctly.
     os.system('echo hello > 1')
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[ imprt('1', target='2') ]]]
     """
@@ -822,7 +821,7 @@ def test_imprt4():
 
 def test_imprt5():
     # Return None if there's nothing to import.
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[ 
             x = imprt()
@@ -833,7 +832,7 @@ def test_imprt5():
 
 def test_anonymous_name():
     # Different content gets a different anonymous name.
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[ 
             x = anonymous_name()
@@ -863,7 +862,7 @@ def test_anonymous_name():
 
 def test_shell_filter():
     # Shell filter runs the command and grabs the result.
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[
             shell_filter('rev')
@@ -880,7 +879,7 @@ def test_before_code_hook():
     os.system('touch 1')
     os.system('touch 2')
 
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[
             x = '@@1'
@@ -895,7 +894,7 @@ def test_before_code_hook():
     assert os.path.isfile('.mash/2')
 
 def test_after_code_hook():
-    code = """
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[
             def after_code_hook(leaf):
@@ -910,7 +909,7 @@ def test_after_code_hook():
     engage_string(code)
 
 def test_backdoor_comment():
-    code = """
+    code = r"""
         [[[
           assert 'ignore' not in self.content
           |||
@@ -920,24 +919,71 @@ def test_backdoor_comment():
     engage_string(code)
 
 def test_spell_check1():
-    code = """
+    """Spell check with no changes."""
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[ spell_check(command='echo') ]]]
     """
     engage_string(code)
 
 def test_spell_check2():
-    code = """
+    """Spell check that changes a file."""
+    code = r"""
         [[[ include mashlib.mash ]]]
         [[[ spell_check(command=f'echo xxx > {original_directory}/dummy.mash; echo') ]]]
     """
     engage_string(code)
 
-def test_latex():
-    code = """
-        [[[ include latex.mash ]]]
+def test_ext():
+    code = r"""
+        [[[ include mashlib.mash ]]]
+        [[[ 
+            assert ext('paper.tex', 'pdf') == 'paper.pdf'
+        ]]]
     """
     engage_string(code)
+
+
+def test_latex1():
+    # Complain if a compiler is specified.
+    code = r"""
+        [[[ include latex.mash ]]]
+        [[[ latex(name='paper', compiler='latex') ]]]
+    """
+    with pytest.raises(ValueError):
+        engage_string(code)
+
+def test_latex2():
+    # LaTeX documents with various features compile.
+    code = r"""
+        [[[ include latex.mash ]]]
+        [[[ save('main.bib') |||
+            @article{xyz,
+                author = {A},
+                title = {B},
+                journal = {C},
+                year = {1960}
+            }
+        ]]]
+        [[[ latex(name='paper', max_compiles=1) |||
+            \documentclass{article}
+            \usepackage{graphicx}
+            \begin{document}
+                hello, world!
+                \cite{xyz}
+                [[[ dot() |||
+                    graph{
+                        A -- B
+                    }
+                ]]]
+                \bibliographystyle{plain}
+                \bibliography{main}
+            \end{document}
+        ]]]
+    """
+    engage_string(code)
+    os.system("evince paper.pdf")
+    assert os.path.isfile('paper.pdf')
 
 if __name__ == '__main__':  #pragma: nocover
     run_tests_from_pattern(sys.argv[1])

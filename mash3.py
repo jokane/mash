@@ -140,7 +140,10 @@ class FrameTreeNode(ABC):
 def default_variables():
     """Return a dictionary to use as the variables in cases where no
     variables dict has been established yet."""
-    return {'RestartRequest': RestartRequest,}
+    return {
+        'RestartRequest': RestartRequest,
+        'TextLeaf': TextLeaf
+    }
 
 class Frame(FrameTreeNode):
     """A frame represents a block containing some text along with code that
@@ -150,6 +153,7 @@ class Frame(FrameTreeNode):
         self.children = []
         self.separated = False
         self.content = None
+        self.result = []
 
     def as_indented_string(self, indent_level=0):
         r = ''
@@ -181,15 +185,18 @@ class Frame(FrameTreeNode):
         self.children = new_children
 
         # Child frames are done.  Our child list should now be just code
-        # leaves.  Execute each of them.
+        # leaves.  Execute each of them.  They might access the accumulated
+        # text in self.content if they want.  They might also add things so
+        # self.result to be returned from here.
         stats += self.execute_children(variables, False)
 
-        # All done.
-        return self.children, stats
+        # All done.  Whatever got added to self.result should replace this
+        # frame in the tree.
+        return self.result, stats
 
     def execute_children(self, variables, frames_only):
-        """Allow each child to execute in parallel.  Wait for all of them to
-        finish.  Replace each child with the replacements that it returns."""
+        """Execute each child in sequence.  Replace each child with the
+        replacements that it returns."""
         new_children = []
         stats = Stats(0, 0, 0)
         for child in self.children:
@@ -253,7 +260,7 @@ class CodeLeaf(FrameTreeLeaf):
             code_obj = compile("after_code_hook(leaf)", self.address.filename, 'exec')
             exec(code_obj, variables, variables)
 
-        return [ TextLeaf(self.address, self.parent, '') ], Stats(0, 1, 0)
+        return [], Stats(0, 1, 0)
 
     def line_marker(self):
         return '*'
