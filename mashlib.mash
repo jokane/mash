@@ -13,6 +13,7 @@ start."""
 
 
 import concurrent.futures
+import glob
 import hashlib
 import os
 import re
@@ -354,6 +355,25 @@ def before_code_hook(leaf):
     regex = r'@'+r'@([A-Za-z0-9_./+-]*)'
     leaf.content = re.sub(regex, import_and_mangle, leaf.content)
     self.content = re.sub(regex, import_and_mangle, self.content)
+
+def spell_check(command='aspell'):
+    """Run aspell or another equivalent comment on every file with a .mash
+    extension in the original directory.  Restart the mash process if any of
+    the files change in that process."""
+
+    restart = False
+    for filename in sorted(glob.glob(os.path.join(original_directory, '*.mash'))):
+        with open(filename, 'r', encoding='utf-8') as it:
+            contents_before = it.read()
+        os.system(f"{command} check --home-dir={original_directory}"
+                  f"--keymapping ispell {filename}")
+        with open(filename, 'r', encoding='utf-8') as it:
+            contents_after = it.read()
+        if contents_before != contents_after:
+            restart = True
+
+    if restart:
+        raise RestartRequest
 
 def at_end():
     """Executed automatically at the end of the run.  Finishes outstanding jobs

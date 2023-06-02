@@ -919,5 +919,19 @@ def test_backdoor_comment():
     """
     engage_string(code)
 
+def test_spell_check1():
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[ spell_check(command='echo') ]]]
+    """
+    engage_string(code)
+
+def test_spell_check2():
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[ spell_check(command=f'echo xxx > {original_directory}/dummy.mash; echo') ]]]
+    """
+    engage_string(code)
+
 if __name__ == '__main__':  #pragma: nocover
     run_tests_from_pattern(sys.argv[1])
