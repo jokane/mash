@@ -861,5 +861,18 @@ def test_anonymous_name():
     """
     engage_string(code)
 
+def test_shell_filter():
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[
+            shell_filter('rev')
+            print(self.content)
+            assert 'olleh' in self.content
+        |||
+            hello world
+        ]]]
+    """
+    engage_string(code)
+
 if __name__ == '__main__':  #pragma: nocover
     run_tests_from_pattern(sys.argv[1])

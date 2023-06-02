@@ -332,6 +332,14 @@ def anonymous_name(content=None):
         content = self.content
     return hashlib.sha1(content.encode('utf-8')).hexdigest()[:7]
 
+def shell_filter(command):
+    """Execute the given command in a shell, giving the contents of this frame
+    as standard input.  Replace the contents of this frame with the output."""
+    future = shell(command, stdin=self.content.encode('utf-8'))
+    completed_process = future.result()
+    self.content = completed_process.stdout.decode('utf-8')
+
+
 def at_end():
     """Executed automatically at the end of the run.  Finishes outstanding jobs
     and raises and exceptions that we've been saving up."""
