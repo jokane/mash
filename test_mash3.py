@@ -909,5 +909,15 @@ def test_after_code_hook():
     """
     engage_string(code)
 
+def test_backdoor_comment():
+    code = """
+        [[[
+          assert 'ignore' not in self.content
+          |||
+          [[[ ||| ignore me ]]]
+        ]]]
+    """
+    engage_string(code)
+
 if __name__ == '__main__':  #pragma: nocover
     run_tests_from_pattern(sys.argv[1])
