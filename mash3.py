@@ -227,6 +227,16 @@ class CodeLeaf(FrameTreeLeaf):
         """ Execute our text as Python code."""
         self.announce(variables)
 
+        # Give the code access to the frame we are executing in (self) and to
+        # this actual object (leaf).
+        variables['self'] = self.parent
+        variables['leaf'] = self
+
+        # Run the stuff that's supposed to run before the stuff.
+        if "before_code_hook" in variables:
+            code_obj = compile("before_code_hook(leaf)", self.address.filename, 'exec')
+            exec(code_obj, variables, variables)
+
         # Fix the indentation.
         source = unindent(self.content)
 
@@ -234,13 +244,14 @@ class CodeLeaf(FrameTreeLeaf):
         # source address.
         source = ('\n'*(self.address.lineno-1)) + source
 
-        # Give the code access to the frame we are executing in.  (...not to
-        # this actual object, which is just a CodeLeaf contained in a Frame.)
-        variables['self'] = self.parent
-
         # Run the stuff.
         code_obj = compile(source, self.address.filename, 'exec')
         exec(code_obj, variables, variables)
+
+        # Run the stuff that's supposed to run after the stuff.
+        if "after_code_hook" in variables:
+            code_obj = compile("after_code_hook(leaf)", self.address.filename, 'exec')
+            exec(code_obj, variables, variables)
 
         return [ TextLeaf(self.address, self.parent, '') ], Stats(0, 1, 0)
 

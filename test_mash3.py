@@ -862,6 +862,7 @@ def test_anonymous_name():
     engage_string(code)
 
 def test_shell_filter():
+    # Shell filter runs the command and grabs the result.
     code = """
         [[[ include mashlib.mash ]]]
         [[[
@@ -870,6 +871,40 @@ def test_shell_filter():
             assert 'olleh' in self.content
         |||
             hello world
+        ]]]
+    """
+    engage_string(code)
+
+def test_before_code_hook():
+    # @@ imports work in both code and text.
+    os.system('touch 1')
+    os.system('touch 2')
+
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[
+            x = '@@1'
+            assert '@' not in x, x
+            assert '@' not in self.content, self.content
+        |||
+            @@2
+        ]]]
+    """
+    engage_string(code)
+    assert os.path.isfile('.mash/1')
+    assert os.path.isfile('.mash/2')
+
+def test_after_code_hook():
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[
+            def after_code_hook(leaf):
+                global x
+                x = 2
+        ]]]
+
+        [[[
+            assert x == 2
         ]]]
     """
     engage_string(code)

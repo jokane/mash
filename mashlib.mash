@@ -15,6 +15,7 @@ start."""
 import concurrent.futures
 import hashlib
 import os
+import re
 import resource
 import shutil
 import subprocess
@@ -339,6 +340,20 @@ def shell_filter(command):
     completed_process = future.result()
     self.content = completed_process.stdout.decode('utf-8')
 
+def before_code_hook(leaf):
+    """Executed for each code leaf before executing it.  For things like
+    "[at][at]abc/xyz", import that file and replace with "xyz".  Note the need
+    to avoid putting two @ symbols together here, because this code might run
+    on itself.  Look for these things both in the code itself and in the text
+    it will operate on."""
+
+    def import_and_mangle(match):
+        fr = match.group(1)
+        to = imprt(fr)
+        return to
+    regex = r'@'+r'@([A-Za-z0-9_./+-]*)'
+    leaf.content = re.sub(regex, import_and_mangle, leaf.content)
+    self.content = re.sub(regex, import_and_mangle, self.content)
 
 def at_end():
     """Executed automatically at the end of the run.  Finishes outstanding jobs
