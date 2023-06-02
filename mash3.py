@@ -234,7 +234,7 @@ class CodeLeaf(FrameTreeLeaf):
 
         # Run the stuff that's supposed to run before the stuff.
         if "before_code_hook" in variables:
-            code_obj = compile("before_code_hook(leaf)", self.address.filename, 'exec')
+            code_obj = compile("before_code_hook()", self.address.filename, 'exec')
             exec(code_obj, variables, variables)
 
         # Fix the indentation.

@@ -36,6 +36,14 @@ except NameError:
 if not mashlib_initialized:
     mashlib_initialized = True
 
+    # These are usually set in the mash core before each chunk of code is
+    # executed.  Dummy values here help to appease pylint.
+    self = None
+    try:
+        leaf
+    except NameError:
+        leaf = None
+
     # A list of executable names whose existence we have already verified.
     executables_checked = set()
 
@@ -341,7 +349,7 @@ def shell_filter(command):
     completed_process = future.result()
     self.content = completed_process.stdout.decode('utf-8')
 
-def before_code_hook(leaf):
+def before_code_hook():
     """Executed for each code leaf before executing it.  For things like
     "[at][at]abc/xyz", import that file and replace with "xyz".  Note the need
     to avoid putting two @ symbols together here, because this code might run
@@ -374,6 +382,16 @@ def spell_check(command='aspell'):
 
     if restart:
         raise RestartRequest
+
+def ext(filename, extension):
+    """Return a modified version of the given filename with the given
+    extension."""
+    x, _ = os.path.splitext(filename)
+    return f"{x}.{extension}"
+
+def push(_):
+    """Send text to the parent frame."""
+
 
 def at_end():
     """Executed automatically at the end of the run.  Finishes outstanding jobs

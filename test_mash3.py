@@ -94,7 +94,7 @@ def start_in_temp_directory():
     symbolic link to) mashlib, and nothing else."""
 
     test_script_dir = os.path.dirname(os.path.abspath(__file__))
-    linked_files = ['mashlib.mash']
+    linked_files = ['mashlib.mash', 'latex.mash']
     linked_files = map(lambda x: os.path.join(test_script_dir, x), linked_files)
 
     with temporary_current_directory(linked_files=linked_files):
@@ -930,6 +930,12 @@ def test_spell_check2():
     code = """
         [[[ include mashlib.mash ]]]
         [[[ spell_check(command=f'echo xxx > {original_directory}/dummy.mash; echo') ]]]
+    """
+    engage_string(code)
+
+def test_latex():
+    code = """
+        [[[ include latex.mash ]]]
     """
     engage_string(code)
 
