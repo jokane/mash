@@ -15,7 +15,7 @@ import test_mash3
 
 def full_check():
     """Run everything."""
-    mashes_to_hack = [ 'mashlib.mash', 'latex.mash' ]
+    mashes_to_hack = [ 'mashlib3.mash', 'latex3.mash' ]
     hacked_dir = '.hacked'
     hack_map = {}
 
@@ -30,8 +30,8 @@ def full_check():
             mash_code = mash_file.read()
 
         py_code = mash_code
-        py_code = re.sub(r'\[\[\[\s?include\s+mashlib.mash\s?]]]',
-                          'from mashlib import * #pragma nocover', py_code)
+        py_code = re.sub(r'\[\[\[\s?include\s+mashlib3.mash\s?]]]',
+                          'from mashlib3 import * #pragma nocover', py_code)
         py_code = re.sub(r'\[\[\[', '', py_code)
         py_code = re.sub(r'\|\|\|', '', py_code)
         py_code = re.sub(r'\]\]\]', '', py_code)

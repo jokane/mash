@@ -1,407 +1,333 @@
 [[[
-"""A library of "standard" functions that provide many of the basic operations
-that one might want to do in a mash document.  Usually include this near the
-start."""
-
 # vim: set ft=python :
-# pylint: disable=invalid-name
-# pylint: disable=global-statement
-# pylint: disable=undefined-variable
-# pylint: disable=too-many-branches
-# pylint: disable=no-else-return
-# pylint: disable=no-else-continue
 
+# This is a library of "standard" functions that provide many of the basic
+# operations that one might want to do on a mash frame.  Most mash documents
+# will include this near the start. 
 
-import concurrent.futures
+import difflib
+import filecmp
 import glob
 import hashlib
 import os
 import re
-import resource
 import shutil
 import subprocess
+import resource
 import sys
-
-
-from exceptiongroup import ExceptionGroup
-
 
 # First, some initialization.  This should only happen once.
 try:
-    mashlib_initialized
+  mashlib_initialized
 except NameError:
-    mashlib_initialized = False
+  mashlib_initialized = False
 
 if not mashlib_initialized:
-    mashlib_initialized = True
+  mashlib_initialized = True
+  # This is the directory where started.
+  original_directory = os.getcwd()
+  sys.path.append(original_directory)
 
-    # These are usually set in the mash core before each chunk of code is
-    # executed.  Dummy values here help to appease pylint.
-    self = None
-    leaf = None
+  # This is the directory where we will do all of our work, execute commands,
+  # etc.  This will be the current directory most of the time.
+  build_directory = os.path.join(original_directory, ".mash")
+  sys.path.append(build_directory)
 
-    # A list of executable names whose existence we have already verified.
-    executables_checked = set()
+  # This directory has things built in previous runs.  If nothing has changed,
+  # then we can just copy things over from there instead of re-building them.
+  archive_directory = os.path.join(original_directory, ".mash-archive")
 
-    # A limit on the number of parallel jobs to run at a time.
-    max_jobs = os.cpu_count() + 4
+  # This is the directory that should contain the completed output files.
+  keep_directory = original_directory
 
-    # The manager for the thread pool that handles expensive jobs, mostly from
-    # shell().  Created on the first call that needs it, rather than here, to
-    # give the client code time to change max_jobs.
-    job_executor = None
+  # This is a list of places we should search when importing a new file.
+  import_search_directories = [original_directory, ]
 
-    # A dictionary mapping resource names to futures of the processes that
-    # are working on them.
-    resource_futures = {}
+  # This is a list of executable names whose existence we have already
+  # verified.
+  executables_checked = dict()
 
-    # A list of *all* of the futures, even the ones with no associated
-    # resources.
-    all_futures = []
+  # Move anything from the existing build directory to be the archive directory.
+  if os.path.exists(build_directory):
+    for file_name in os.listdir(build_directory):
+      if not os.path.exists(archive_directory):
+        os.makedirs(archive_directory)
+      full_file_name = os.path.join(build_directory, file_name)
+      full_file_name_archive = os.path.join(archive_directory, file_name)
+      if os.path.isdir(full_file_name_archive):
+        shutil.rmtree(full_file_name_archive)
+      #print("%s --> %s" % (full_file_name, archive_directory))
+      shutil.move(full_file_name, os.path.join(archive_directory, file_name))
 
-    # This is the directory where started.
-    original_directory = os.getcwd()
-    sys.path.append(original_directory)
 
-    # This is the directory where we will do all of our work, execute
-    # commands, etc.  This will be the current directory most of the time.
-    build_directory = os.path.join(original_directory, ".mash")
-    sys.path.append(build_directory)
 
-    # This directory has things built in previous runs.  If nothing has
-    # changed, then we can just copy things over from there instead of
-    # re-building them.
-    archive_directory = os.path.join(original_directory, ".mash-archive")
+  # Make sure we have a build directory and that it's the current/working
+  # directory.
+  if not os.path.exists(build_directory):
+    #print("Creating", build_directory)
+    os.makedirs(build_directory)
+  os.chdir(build_directory)
 
-    # This is the directory that should contain the completed output files.
-    keep_directory = original_directory
-
-    # This is a list of places we should search when importing a new file.
-    import_search_directories = [original_directory, ]
-
-    # Move anything from the existing build directory to the archive directory.
-    if os.path.exists(build_directory):
-        for file_name in os.listdir(build_directory):
-            if not os.path.exists(archive_directory):
-                os.makedirs(archive_directory)
-            full_file_name = os.path.join(build_directory, file_name)
-            full_file_name_archive = os.path.join(archive_directory, file_name)
-            if os.path.isdir(full_file_name_archive):
-                shutil.rmtree(full_file_name_archive)
-            shutil.move(full_file_name, os.path.join(archive_directory, file_name))
-
-    # Make sure we have a build directory and that it's the current/working
-    # directory.
-    if not os.path.exists(build_directory):
-        os.makedirs(build_directory)
-    os.chdir(build_directory)
-
-def check_for_executable(exe):
-    """Check whether some executable with the given name exists in the path.
-    If it does not exist, complain."""
-    if exe not in executables_checked and shutil.which(exe) is None:
-        raise ValueError(f'Executable {exe} not found in path.')
-    executables_checked.add(exe)
-
-def shell(command, stdin=None, check=True, provides=None):
-    """Execute the given command asyncronously in a shell.  Raise
-    subprocess.CalledProcessError if the command gives a non-zero return
-    code.  Return a future, which when completed results in
-    CompletedProcess object, which has stdout and stderr attributes.  In
-    addition, this object has attributes tacked on to it showing the user
-    time and system time consumed, as reported by getrusage."""
-
-    global job_executor
-
-    if job_executor is None:
-        job_executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_jobs)
-
-    if check:
-        check_for_executable(command.split(' ')[0])
-
-    print("  ", command)
-
-    if provides is None:
-        provides = []
-    if isinstance(provides, str):
-        provides = [ provides ]
-
-    def run_job():
-        usage_before = resource.getrusage(resource.RUSAGE_CHILDREN)
-
-        completed_process = subprocess.run(command,
-                                           shell=True,
-                                           check=True,
-                                           input=stdin,
-                                           stdout=subprocess.PIPE,
-                                           stderr=subprocess.PIPE,
-                                           timeout=60000)
-        usage_after = resource.getrusage(resource.RUSAGE_CHILDREN)
-        completed_process.user_time = usage_after.ru_utime - usage_before.ru_utime
-        completed_process.sys_time = usage_after.ru_stime - usage_before.ru_stime
-        return completed_process
-
-    future = job_executor.submit(run_job)
-    for res in provides:
-        resource_futures[res] = future
-    all_futures.append(future)
-    return future
-
-def wait_for(res):
-    """Wait for shell process creating the named resource to complete.
-    Return its CompletedProcess.  Or, if an exception occured in the
-    process, raise it."""
-    future = resource_futures[res]
-    return future.result()
+def ext(filename, ext):
+  """Return a modified version of the given filename with the given extension."""
+  (x,y) = os.path.splitext(filename)
+  return x + "." + ext
 
 def save(target, contents=None):
-    """Ensure that the given text (default: current contents of this frame)
-    exist in the build directory as a file with the given name.  Use an old
-    copy from the archive directory if possible."""
+  """Ensure that the current contents of this frame exist in the build
+  directory as a file with the given name.  Use an old copy from the archive
+  directory if possible."""
+  global _
+  
+  # Use the current frame text by default.
+  if contents is None:
+    contents = _.text
 
-    # Use the current frame text by default.
-    if contents is None:
-        contents = self.content
+  # Are we dealing with binary data or text?
+  binary = hasattr(contents, 'decode')
+  if binary:
+    bin_mode_flag = 'b'
+  else:
+    bin_mode_flag = ''
 
-    # Are we dealing with binary data or text?
-    binary = hasattr(contents, 'decode')
-    if binary:
-        bin_mode_flag = 'b'
-    else:
-        bin_mode_flag = ''
+  # Check for an identically-named, identical-contents file in the archive
+  # directory.
+  archive_name = os.path.join(archive_directory, target)
+  try:
+    existing_contents = open(archive_name, 'r' + bin_mode_flag).read()
+    exists_already = (existing_contents == contents)
+  except IOError as e:
+    exists_already = False
 
-    # Check for an identically-named, identical-contents file in the archive
-    # directory.
-    archive_name = os.path.join(archive_directory, target)
+  if exists_already:
+    # We have this exact file in the archive directory.  Copy it instead of
+    # saving directly.  This keeps the timestamp intact, which can help us
+    # tell elsewhere if things need to be rebuilt.
+    #print("Using %s from archive." % target)
     try:
-        with open(archive_name, 'r' + bin_mode_flag) as input_file:
-            existing_contents = input_file.read()
-        exists_already = (existing_contents == contents)
-    except IOError:
-        exists_already = False
+        shutil.copy2(archive_name, target)
+    except shutil.SameFileError:
+        pass
 
-    if exists_already:
-        # We have this exact file in the archive directory.  Copy it instead
-        # of saving directly.  This keeps the timestamp intact, which can
-        # help us elsewhere to tell if things need to be rebuilt.
-        try:
-            shutil.copy2(archive_name, target)
-        except shutil.SameFileError:
-            pass
-
-    else:
-        # We don't have a file like this anywhere.  Actually save it.
-        with open(target, 'w'+bin_mode_flag) as output_file:
-            output_file.write(contents)
+  else:
+    # We don't have a file like this anywhere.  Actually save it.
+    #print("Writing %d bytes to %s." % (len(_.text), target))
+    open(target, 'w'+bin_mode_flag).write(contents)
+ 
+def read(fname):
+  _.text += open(fname, 'r').read()
 
 def recall(target, *sources):
-    """If any of the sources are being built by an active shell job, wait
-    until that shell job finishes.  Then check whether the given target file
-    exists in the archive directory, and if so, if it's newer than all of the
-    given sources.  If so, copy it over and return the target.  If not, do
-    nothing and return None."""
+  """Check whether the given target file exists in the archive directory,
+  and if so, if it's newer than all of the given sources.  If so, copy it
+  over and return True.  If not, do nothing and return False."""
+  archive_target = os.path.join(archive_directory, target)
 
-    archive_target = os.path.join(archive_directory, target)
+  ok = True
 
-    ok = True
-
-    for source in sources:
-        if source in resource_futures:
-            wait_for(source)
-
-    if not os.path.exists(archive_target):
-        print(f"({target}): [does not exist]", end='')
-        ok = False
-        target_time = None
-    else:
-        print(f"{target}:", end='')
-        target_time = os.path.getmtime(archive_target)
-        if sources:
-            sources = list(dict.fromkeys(sources))
-            for source in sources:
-                try:
-                    source_time = os.path.getmtime(source)
-                except FileNotFoundError as fnfe:
-                    raise FileNotFoundError(f'While checking dependencies for '
-                                    f'{target}, could not find file {source}. '
-                                    f'Full dependency list is {sources}.') from fnfe
-                if target_time is not None and source_time > target_time:
-                    print(f" ({source})", end='')
-                    ok = False
-                else:
-                    print(f" {source}", end='')
+  if not os.path.exists(archive_target):
+    print("(%s): [does not exist]" % target, end='')
+    ok = False
+    target_time = None
+  else:
+    print("%s:" % target, end='')
+    target_time = os.path.getmtime(archive_target)
+    if sources:
+      sources = list(dict.fromkeys(sources))
+      for source in sources:
+        try:
+          source_time = os.path.getmtime(source)
+        except FileNotFoundError:
+          raise Exception(f'While checking dependencies for {target}, could not find file {source}.  Full dependency list is {sources}.')
+        if target_time is not None and source_time > target_time:
+          print(" (%s)" % source, end='')
+          ok = False
         else:
-            print(" [no sources]")
-
-    print()
-
-    if ok:
-        if os.path.isfile(archive_target):
-            shutil.copy2(archive_target, build_directory)
-        else:
-            if os.path.exists(target):
-                shutil.rmtree(target)
-            shutil.copytree(archive_target, os.path.join(build_directory, target))
-        return None
+          print(" %s" % source, end='')
     else:
-        return target
+      print(" [no sources]")
 
-def keep(file_to_keep):
-    """Copy a file or directory from the working directory to
-    the keep directory."""
+
+  print()
+
+  if ok:
+    if os.path.isfile(archive_target):
+      shutil.copy2(archive_target, build_directory)
+    else:
+      if os.path.exists(target):
+        shutil.rmtree(target)
+      shutil.copytree(archive_target, os.path.join(build_directory, target))
+
+  return ok
+
+def anon(content=None):
+  """Return an anonymous name constructed by hashing the given content or, by
+  default, the contents of the current frame."""
+  global _
+  if content is None:
+    content = _.text
+  return hashlib.sha1(content.encode('UTF-8')).hexdigest()[:7]
+
+def shell(command, stdin=None, check=True):
+  """
+  Execute the given command in a shell.  Raise subprocess.CalledProcessError
+  if the command gives a non-zero return code.  Return the CompletedProcess
+  object, which has stdout and stderr attributes.  In addition, this object
+  has attributes tacked on to it showing the user time and system time
+  consumed, as reported by getrusage.
+  """
+
+  if check:
+    check_for_executable(command.split(' ')[0])
+  print("  ", command)
+  usage_before = resource.getrusage(resource.RUSAGE_CHILDREN)
+  completed_process = subprocess.run(command, shell=True, check=True, input=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60000)
+  usage_after = resource.getrusage(resource.RUSAGE_CHILDREN)
+  completed_process.user_time = usage_after.ru_utime - usage_before.ru_utime
+  completed_process.sys_time = usage_after.ru_stime - usage_before.ru_stime
+  return completed_process
+
+
+def push(text=""):
+  """Insert text, either the given argument or the contents of the current frame, into the parent frame."""
+  global _
+  if text:
+    _.parent.contents += str(text)
+  else:
+    _.parent.contents += _.text
+
+def keep(source, target=None):
+    """Copy a file or directory from the working directory to the keep
+    directory.  Possibly rename it or put it in a subdirectory."""
+
+    # Sanity check: Is the keep directory set reasonably?
     if not os.path.isabs(keep_directory):
-        raise ValueError(f'Keep directory ({keep_directory}) is a relative path. '
-                        f'This would be interpreted relative to the build directory ',
-                        f'({build_directory}).  This almost certainly not what you want. '
-                        f'Use an absolute path for keep_directory instead.')
+        raise Exception(f'Keep directory ({keep_directory}) is a relative path, which would be interpreted relative to the build directory ({build_directory}).  This almost certainly not what you want.  Use an absolute path for keep_directory instead.')
 
-    if not os.path.exists(keep_directory):
-        os.makedirs(keep_directory)
-    if os.path.isfile(file_to_keep):
-        shutil.copy2(file_to_keep, keep_directory)
-    elif os.path.isdir(file_to_keep):
-        target = os.path.join(keep_directory, file_to_keep)
+    # What should the destination be?
+    if target is None:
+        target = source
+    target = os.path.join(keep_directory, target)
+
+    # Make sure the destintation directory exists.  Note that we can't just
+    # check for the keep directory itself, because the target might be in a
+    # subdirectory.
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+
+    # Actually copy it to the keep directory.  One might be tempted to move the
+    # files instead of copying at this point, but that won't work --- we need
+    # the original copies in .mash, so they'll be in .mash-archive next time,
+    # so that we can tell if things need to be re-built.
+    if os.path.isfile(source):
+        shutil.copy2(source, target)
+    elif os.path.isdir(source):
         if os.path.exists(target):
             shutil.rmtree(target)
-        shutil.copytree(file_to_keep, target)
-    elif not os.path.exists(file_to_keep):
-        raise FileNotFoundError(f"Cannot keep {file_to_keep} because it does not exist.")
+        shutil.copytree(source, target)
     else:
-        raise NotImplementedError(f"Don't know how to keep {file_to_keep}, "
-                                   "which is neither file nor directory.")
-
-def read(fname):
-    """Read the given file, appending to the content of the current frame."""
-    with open(fname, 'r', encoding='utf-8') as it:
-        self.content += it.read()
-
+        print(source)
+        raise Exception("Don't know how to keep %s, which is neither file nor directory." % source)
+  
 def imprt(*fnames, target=None, conditional=False):
-    """Copy one or more files to the build directory, looking in the
-    directories listed in import_search_directories to find them.  If target is
-    given, the file (of which there must be only one) will be renamed as it is
-    imported.  If conditional is True, don't complain if the files don't
-    exist."""
+  """Copy one or more files to the build directory.  If target is given, there should be only one file name given, and the file will be renamed as it is imported.  If conditional=True, don't complain if the files don't exist."""
 
-    # Sanity check.
-    if target and len(fnames) > 1:
-        raise ValueError("Called imprt() with both multiple inputs and a target.")
+  # Sanity check.
+  if target and len(fnames) > 1:
+    raise Exception("Called imprt() with both multiple inputs and a target.")
+    
+  # Import each thing, one at a time.
+  for fname in fnames:
+    # Figure out the source filename.
+    fr = None
+    for directory in import_search_directories:
+      x = os.path.join(directory, fname)
+      if os.path.exists(x):
+        fr = x
+        break
+    if fr is None:
+      if conditional:
+        continue
+      else:
+        raise Exception("Trying to import %s, but could not find it in any of these places:\n %s" % (fname, '\n'.join(import_search_directories)))
 
-    # Import each thing, one at a time.
-    for fname in fnames:
-        # Figure out the source filename.
-        fr = None
-        for directory in import_search_directories:
-            x = os.path.join(directory, fname)
-            if os.path.exists(x):
-                fr = x
-                break
-
-        # If we didn't find it, maybe complain and definitely give up on this
-        # one.
-        if fr is None:
-            if conditional:
-                continue
-            else:
-                raise FileNotFoundError(f"Trying to import {fname} but could not "
-                                         "find it in any of these places:\n"
-                                         + '\n'.join(import_search_directories))
-
-        # Figure out the destination filename.
-        if not target:
-            dest = os.path.basename(fname)
-        else:
-            dest = target
-        to = os.path.join(build_directory, dest)
-
-        # Does this file exist already?  If not, copy it in.
-        if not os.path.isfile(to) or not filecmp.cmp(fr, to, False):
-            print(fr)
-            shutil.copy2(fr, to)
-
-    # Return the name of the (last) imported file.
-    if len(fnames) > 0:
-        return os.path.basename(fnames[-1])
+    # Figure out the destination filename.
+    if not target:
+      dest = os.path.basename(fname)
     else:
-        return None
+      dest = target
+    to = os.path.join(build_directory, dest)
 
-def anonymous_name(content=None):
-    """Return an anonymous name constructed by hashing the given content or,
-    by default, the contents of the current frame."""
-    if content is None:
-        content = self.content
-    return hashlib.sha1(content.encode('utf-8')).hexdigest()[:7]
+    # Does this file exist already?
+    if os.path.isfile(to) and filecmp.cmp(fr, to, False):
+      # Yes.  Nothing to do.
+      pass
+    else:
+      print(fr)
+      shutil.copy2(fr, to)
+
+  try:
+    return os.path.basename(fname)
+  except UnboundLocalError:
+    return None
 
 def shell_filter(command):
-    """Execute the given command in a shell, giving the contents of this frame
-    as standard input.  Replace the contents of this frame with the output."""
-    future = shell(command, stdin=self.content.encode('utf-8'))
-    completed_process = future.result()
-    self.content = completed_process.stdout.decode('utf-8')
+  """
+  Execute the given command in a shell, giving the contents of this frame as
+  standard input.  Replace the contents of this frame with the output.
+  """
+  result = shell(command, stdin=_.text.encode('utf-8'))
+  _.text = result.stdout.decode('utf-8')
 
-def before_code_hook():
-    """Executed for each code leaf before executing it.  For things like
-    "[at][at]abc/xyz", import that file and replace with "xyz".  Note the need
-    to avoid putting two @ symbols together here, because this code might run
-    on itself.  Look for these things both in the code itself and in the text
-    it will operate on."""
+def strip():
+  _.text = _.text.rstrip().lstrip()
 
-    def import_and_mangle(match):
-        fr = match.group(1)
-        to = imprt(fr)
-        return to
-    regex = r'@'+r'@([A-Za-z0-9_./+-]*)'
-    leaf.content = re.sub(regex, import_and_mangle, leaf.content)
-    self.content = re.sub(regex, import_and_mangle, self.content)
-
-def spell_check(command='aspell'):
-    """Run aspell or another equivalent comment on every file with a .mash
-    extension in the original directory.  Restart the mash process if any of
-    the files change in that process."""
-
-    restart = False
-    for filename in sorted(glob.glob(os.path.join(original_directory, '*.mash'))):
-        with open(filename, 'r', encoding='utf-8') as it:
-            contents_before = it.read()
-        os.system(f"{command} check --home-dir={original_directory}"
-                  f"--keymapping ispell {filename}")
-        with open(filename, 'r', encoding='utf-8') as it:
-            contents_after = it.read()
-        if contents_before != contents_after:
-            restart = True
-
-    if restart:
-        raise RestartRequest
-
-def ext(filename, extension):
-    """Return a modified version of the given filename with the given
-    extension."""
-    x, _ = os.path.splitext(filename)
-    return f"{x}.{extension}"
-
-def push(text = None):
-    """Insert text, either the given argument or the contents
-    of the current frame, into the parent frame."""
-    if text is None:
-        text = self.content
-    self.result.append(TextLeaf(leaf.address, self.parent, text))
+def unindent():
+  if '\n' not in _.text:
+    _.text = _.text.strip()
+  else:
+    match = re.search(r'([ \t]*)[^ \t\n]', _.text)
+    if match:
+      prefix = match.group(1)
+      _.text = re.sub('\n' + prefix, '\n', _.text)
 
 
-def at_end():
-    """Executed automatically at the end of the run.  Finishes outstanding
-    jobs and raises and exceptions that we've been saving up."""
-    # Finish up any jobs that are still running.
-    exceptions = []
-    print(f'At end there are {len(all_futures)} futures.')
-    for future in all_futures:
-        try:
-            future.result()
-        except Exception as exception:  #pylint: disable=broad-except
-            exceptions.append(exception)
+def before_frame_hook():
+  # For things like "[at][at]abc/xyz", import that file and replace with
+  # "xyz".  Note the need to avoid putting two @ symbols together here,
+  # because this code might run on itself.
+  def import_and_mangle(match):
+    fr = match.group(1)
+    # fr = os.path.join(original_directory,fr)
+    to = imprt(fr)
+    return to
+  regex = r'@'+r'@([A-Za-z0-9_./+-]*)'
+  _.text = re.sub(regex, import_and_mangle, _.text)
+  _.commands = re.sub(regex, import_and_mangle, _.commands)
 
-    # Report any exceptions that occured.
-    if len(exceptions) == 1:
-        raise exceptions[0]
-    if len(exceptions) > 1:
-        raise ExceptionGroup("multiple failed jobs", exceptions)
+def spell_check():
+  """
+  Run aspell on every file with a .mash extension in the original directory.
+  """
+  restart = False
+  for file_name in glob.glob(os.path.join(original_directory, '*.mash')):
+    contents_before = open(file_name, 'r').read()
+    os.system("aspell check --home-dir=" + original_directory + " --keymapping ispell " + file_name)
+    contents_after = open(file_name, 'r').read()
+    if(contents_before != contents_after):
+      restart = True
+
+  if restart:
+    raise RestartRequest
+
+def check_for_executable(exe):
+  """
+  Check whether some executable with the given name exists in the path.  If it
+  does not exist, complain.
+  """
+  if exe not in executables_checked and shutil.which(exe) is None:
+    raise Exception(f'Executable {exe} not found in path.')
+  executables_checked[exe] = True
+
 
 ]]]
+

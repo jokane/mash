@@ -1,141 +1,102 @@
-"""Methods for compiling LaTeX documents."""
-
-# vim: set ft=python :
-
-# pylint: disable=consider-using-f-string
-# pylint: disable=invalid-name
-# pylint: disable=no-else-return
-# pylint: disable=too-many-arguments
-# pylint: disable=too-many-branches
-# pylint: disable=too-many-locals
-# pylint: disable=too-many-statements
-# pylint: disable=unused-wildcard-import
-# pylint: disable=unused-wildcard-import
-# pylint: disable=wildcard-import
-
 [[[ include mashlib.mash ]]]
 
 [[[
+  try:
+      latex_mode
+  except NameError:
+      latex_mode = 'pdflatex'
+    # Which LaTeX compiler should we use?  Choices are:
+    # -- pdflatex
+    # -- latex
+    # -- xelatex
+    # This affects both the specific compiler used and the graphics formats.
 
-# Which LaTeX compiler should we use?  Choices are:
-# -- pdflatex (default)
-# -- latex
-# -- xelatex
-# This affects both the specific compiler used and the graphics formats.
-try:
-    latex_mode
-except NameError:
-    latex_mode = 'pdflatex'
-
-def latex(name, compiler=None, ignore_deps=None, keep_pdf=True, callback=None,
-          max_compiles=None, strict=False):
-    """Compile a frame as a LaTeX document."""
-
+  def latex(name, compiler=None, ignore_deps=list(), keep_pdf=True, callback=None, max_compiles=None, strict=False):
     # Complain in old documents.
     if compiler is not None:
-        raise ValueError('Compiler argument to latex() is no longer supported. '
-                        'Set the latex_mode variable instead.')
+      raise Exception('Compiler argument to latex() is no longer supported.  Set latex_mode variable instead.')
 
     # Write the document.
-    save(name + ".tex")
-    print(self.content)
+    save(name + ".tex") 
 
     # Build a list of dependencies.
-
+    
     # Patterns to find dependencies.  Each one should be a tuple, with:
     # - A regex with a group named 'dep' that gives the stuff to match, and
     # - A function to return a list of things to depend on, or None, if the
     # 'dep' group matches the name directly.
-    bib_split =  lambda x: [y if y.endswith('.bib') else y + '.bib' for y in x.split(',')]
     dep_patterns = [
       (r'\\includegraphics(\[.*?\])?{(?P<dep>[^}]*)}', None),
       (r'\\lstinputlisting(\[.*?\])?{(?P<dep>[^}]*)}', None),
       (r'\\input{(?P<dep>[^}]*)}', None),
       (r'\\includepdf{(?P<dep>[^}]*)}', None),
       (r'% dep (?P<dep>[^\n]*)', None),
-      (r'\\bibliography{(?P<dep>[^\n]*)}', bib_split)
+      (r'\\bibliography{(?P<dep>[^\n]*)}', lambda x: [y if y.endswith('.bib') else y + '.bib' for y in x.split(',')])
     ]
 
     deps = [name + ".tex"]
     for pattern,func in dep_patterns:
-        for match in re.finditer(pattern, self.content, re.DOTALL):
-            if func:
-                deps = deps + func(match.group('dep'))
-            else:
-                deps.append(match.group('dep'))
-
-    if ignore_deps is None:
-        ignore_deps = []
+      for match in re.finditer(pattern, _.text, re.DOTALL):
+        if func:
+          deps = deps + func(match.group('dep'))
+        else:
+          deps.append(match.group('dep'))
+          
     deps = [item for item in deps if item not in ignore_deps]
     deps = [item for item in deps if not re.match('#.*', item)]
 
-    if x := recall(name+".pdf", *deps):
-        # Run the compiler over and over until the log stops changing.
-        last_log = ''
-        bibtex_done = False
-        makeindex_done = False
-        callback_done = False
-        compiles = 0
-        while True:
-            compiles+=1
-            try:
-                shell(f"{latex_mode} --shell-escape -interaction=batchmode "
-                      f"-file-line-error -halt-on-error {name}", provides=x)
-                wait_for(x)
-            except subprocess.CalledProcessError as e:
-                with open(f'{name}.log', 'r', encoding='utf-8') as it:
-                    e.stderr = it.read()
-                raise e
+    if not recall(name+".pdf", *deps):
+      # Run the compiler over and over until the log stops changing.
+      last_log = ''
+      bibtex_done = False
+      makeindex_done = False
+      callback_done = False
+      compiles = 0
+      while True:
+        try:
+          shell(latex_mode + " --shell-escape -interaction=batchmode -file-line-error -halt-on-error %s" % name)
+          # shell(latex_mode + " -interaction=batchmode -file-line-error -halt-on-error %s" % name)
+          compiles+=1
+        except subprocess.CalledProcessError as e:
+          e.stderr = open(name + '.log', 'r').read()
+          raise e
+        log = open(name+'.log', 'r').read()
+        if not callback_done and callable(callback):
+          callback()
+        if not bibtex_done:
+          aux = open(name+'.aux', 'r').read()
+          if re.search(r'\\citation', aux):
+            shell("bibtex -terse %s" % name)
+            bibtex_done = True             
+          if re.search(r'cite', aux):
+            shell("biber %s" % name)
+            bibtex_done = True
+        if not makeindex_done and os.path.isfile(name+".idx"):
+          shell("makeindex %s.idx" % name)
+          makeindex_done = True
+        if max_compiles and compiles >= max_compiles: break
+          
+        if log == last_log: break
+        last_log = log
 
+      if latex_mode == 'latex':
+        shell('dvipdf %s.dvi' % name)
 
-            with open(f'{name}.log', 'r', encoding='utf-8') as it:
-                log = it.read()
-            if not callback_done and callable(callback):
-                callback()
-            if not bibtex_done:
-                with open(f'{name}.aux', 'r', encoding='utf-8') as it:
-                    aux = it.read()
-                if re.search(r'\\citation', aux):
-                    future = shell("bibtex -terse %s" % name)
-                    future.result()
-                    bibtex_done = True
-                if re.search(r'cite', aux):
-                    shell("biber %s" % name)
-                    bibtex_done = True
-
-            if not makeindex_done and os.path.isfile(name+".idx"):
-                shell("makeindex %s.idx" % name)
-                makeindex_done = True
-
-            if max_compiles and compiles >= max_compiles:
-                break
-
-            if log == last_log:
-                break
-
-            last_log = log
-
-        if latex_mode == 'latex':
-            shell('dvipdf %s.dvi' % name)
-
-        # If we are doing strict checking, dig through the final log, looking
-        # for problems.
-        if strict:
-            complaints = check_latex_log(log)
-            if complaints:
-                # Found something wrong.  Remove the output to ensure that the next
-                # build will try to compile again.  Then complain.
-                os.remove(name+".pdf")
-                raise Exception(complaints)
+      # If we are doing strict checking, dig through the final log, looking
+      # for problem.
+      if strict:
+        complaints = check_latex_log(log)
+        if complaints:
+          # Found something wrong.  Remove the output to ensure that the next
+          # build will try to compile again.  Then complain.
+          os.remove(name+".pdf") 
+          raise Exception(complaints)
 
     if keep_pdf:
-        os.system('ls -l')
-        keep(name+".pdf")
+      keep(name+".pdf")
 
-def check_latex_log(log):
-    """ Given the contents of a LaTeX log file, check it for important
-    warnings.  Return a string describing the complaints, or None if there's
-    nothing to complain about. """
+  def check_latex_log(log):
+    """ Given the contents of a LaTeX log file, check it for important warnings.  Return a string describing the complaints, or None if there's nothing to complain about. """
 
     print(log)
     problem_patterns = [
@@ -143,74 +104,71 @@ def check_latex_log(log):
       r"LaTeX Warning: Citation `.*' on page \d+ undefined on input line \d+."
     ]
 
-    complaints = []
+    complaints = list()
 
     for pattern in problem_patterns:
-        for match in re.finditer(pattern, log):
-            complaints.append(match.group(0))
+      for match in re.finditer(pattern, log):
+        complaints.append(match.group(0))
 
     if complaints:
-        return '\n'.join(complaints)
+      return '\n'.join(complaints)
     else:
-        return None
+      return None
 
 
-def dot(name=None, via_xfig=False, xfig_direct=True, args=''):
-    """Compile this frame as a graphviz document and insert the image into the
-    parent frame."""
-
+  def dot(name=None, via_xfig=False, xfig_direct=True, args=''):
     # If we don't have any text in the frame, complain.
-    if not self.content.strip():
-        raise ValueError("Called dot() on an empty frame.  This is unlikely to end well.")
+    if not _.text.strip():
+      raise Exception("Called dot() on an empty frame.  This is unlikely to end well.")
 
     # If we don't have a name, make one up.
     if not name:
-        name = anonymous_name()
+      name = anon()
 
     # Figure out which format we should convert to.
     if latex_mode == 'latex':
-        fmt = 'eps'
+      fmt = 'eps'
     else:
-        fmt = 'pdf'
+      fmt = 'pdf'
 
     name_dot = ext(name, 'dot')
     name_fig = ext(name, 'fig')
     name_fmt = ext(name, fmt)
     save(name_dot)
     if via_xfig:
-        if x := recall(name_fig, name_dot):
-            shell("dot -Tfig %s > %s" % (name_dot, name_fig), provides=x)
-        xfig(name_fig, args, direct=xfig_direct)
+      if not recall(name_fig, name_dot):
+        shell("dot -Tfig %s > %s" % (name_dot, name_fig))
+      xfig(name_fig, args, direct=xfig_direct)
     else:
-        if x := recall(name_fmt, name_dot):
-            shell("dot -T%s %s > %s" % (fmt, name_dot, name_fmt), provides=x)
-        push("\\includegraphics[%s]{%s}" % (args, name_fmt))
+      if not recall(name_fmt, name_dot):
+        shell("dot -T%s %s > %s" % (fmt, name_dot, name_fmt))
+      push("\\includegraphics[%s]{%s}" % (args, name_fmt))
 
-def xfig(fname_fig, args='', direct=True, include_depths=None, exclude_depths=None):
-    """Insert an xfig diagram."""
+  def xfig(fname_fig, args='', direct=True, include_depths=None, exclude_depths=None):
+    """
+    Insert an xfig diagram.
+    """
 
     # Sanity check.
     if include_depths and exclude_depths:
-        raise ValueError("Got both include_depths and exclude_depths.  Can't do both.")
+      raise Exception("Got both include_depths and exclude_depths.  Can't do both.")
 
-    with open(fname_fig, 'r', encoding='utf-8') as it:
-        fig_source = it.read()
+    fig_source = open(fname_fig, 'r').read()
 
     # Find any referenes to embedded images.
-    deps = []
-    pattern = r'^(2 5 ([0-9\.-]*\s+){13}[0-9\.-]*$\s*\d\s*(.*))'
-    for match in re.finditer(pattern, fig_source, re.MULTILINE):
-        pic = match.group(3)
-        imprt(pic)
-        deps.append(pic)
+    deps = list()
+    for match in re.finditer(r'^(2 5 ([0-9\.-]*\s+){13}[0-9\.-]*$\s*\d\s*(.*))', fig_source, re.MULTILINE):
+      pic = match.group(3)
+      imprt(pic)
+      deps.append(pic)
 
     # Figure out which format we should convert to.
     if latex_mode == 'latex':
-        fmt = 'eps'
-        shfmt = 'ps'
+      fmt = 'eps'
+      shfmt = 'ps'
     else:
-        fmt = 'pdf'
-        shfmt = 'pdf'
+      fmt = 'pdf'
+      shfmt = 'pdf'
 
     # Get the main root filename.
     fname = ext(fname_fig, '')[:-1]
@@ -218,72 +176,66 @@ def xfig(fname_fig, args='', direct=True, include_depths=None, exclude_depths=No
     # Sort out the include/exclude business.
     fig2dev_args = ""
     if include_depths or exclude_depths:
-        # Which list are we working with?
-        if include_depths:
-            flag = '+'
-            depths = include_depths
-        if exclude_depths:
-            flag = '-'
-            depths = exclude_depths
+      # Which list are we working with?
+      if include_depths:
+        flag = '+'
+        depths = include_depths
+      if exclude_depths:
+        flag = '-'
+        depths = exclude_depths
 
-        # Make sure we actually have a list.
-        try:
-            iter(depths)
-        except TypeError:
-            depths = (depths, )
+      # Make sure we actually have a list.
+      try:
+        iter(depths)
+      except TypeError: 
+        depths = (depths, )
 
-        # Put the list into the format fig2dev expects.
-        depths = flag + ",".join(map(str, depths))
+      # Put the list into the format fig2dev expects.
+      depths = flag + ",".join(map(lambda x: str(x), depths))
 
-        # Append this string to the file name, so we can build distinct
-        # versions of the same fig from different depths.
-        fname += "-depths" + depths
+      # Append this string to the file name, so we can build distinct
+      # versions of the same fig from different depths.
+      fname += "-depths" + depths
 
-        # Make sure fig2dev gets the message about which depths we want.
-        fig2dev_args += "-K -D" + depths
+      # Make sure fig2dev gets the message about which depths we want.
+      fig2dev_args += "-K -D" + depths
 
     fname_fmt = ext(fname, fmt)
     fname_tex = ext(fname, 'tex')
 
     if direct:
-        # Convert to the two part pdf/latex or ps/latex form.  Typesets using
-        # LaTeX, but cannot accept includegraphics arguments.
-        if args != '':
-            raise Exception("Don't know what to do with args in xfig() with "
-                            r"direct=True.  Maybe wrap in a \resizebox instead?")
+      # Convert to the two part pdf/latex or ps/latex form.  Typesets using
+      # LaTeX, but cannot accept includegraphics arguments.
+      if args != '':
+        raise Exception(r"Don't know what to do with args in xfig() with direct=True.  Maybe wrap in a \resizebox instead?")
 
-        if x := recall(fname_fmt, fname_fig, *deps):
-            shell("fig2dev -L %stex %s -O %s > %s"
-                  % (shfmt, fig2dev_args, fname_fig, fname_fmt), provides=x)
-        if x:= recall(fname_tex, fname_fig, *deps):
-            shell("fig2dev -L %stex_t %s -p %s %s > %s"
-                  % (shfmt, fig2dev_args, fname_fmt, fname_fig, fname_tex), provides=x)
-        push(r"\input{%s}" % (fname_tex, ))
+      if not recall(fname_fmt, fname_fig, *deps):
+        shell("fig2dev -L %stex %s -O %s > %s" % (shfmt, fig2dev_args, fname_fig, fname_fmt))
+      if not recall(fname_tex, fname_fig, *deps):
+        shell("fig2dev -L %stex_t %s -p %s %s > %s" % (shfmt, fig2dev_args, fname_fmt, fname_fig, fname_tex))
+      push(r"\input{%s}" % (fname_tex, ))
     else:
-        # Convert directly to an external format that can be inserted with
-        # \includegraphics.  Does not typeset labels with LaTeX.
-        if x := recall(fname_fmt, fname_fig, *deps):
-            shell("fig2dev -L %s %s %s %s" % (fmt, fig2dev_args, fname_fig, fname_fmt), provides=x)
-        push(r"\includegraphics[%s]{%s}" % (args, fname_fmt))
+      # Convert directly to an external format that can be inserted with
+      # \includegraphics.  Does not typeset labels with LaTeX.
+      if not recall(fname_fmt, fname_fig, *deps):
+        shell("fig2dev -L %s %s %s %s" % (fmt, fig2dev_args, fname_fig, fname_fmt))
+      push("\includegraphics[%s]{%s}" % (args, fname_fmt))
 
-def asy(name=None, args=''):
-    """Insert an image generated from Asymptote source."""
+  def asy(name=None, args=''):
+    # If we don't have any text to compile, complain.
+    if not _.text.strip() and not name:
+      raise Exception("Called asy() on an empty frame and not file to read.  This is unlikely to end well.")
 
     # If we don't have any text to compile, complain.
-    if not self.content.strip() and not name:
-        raise ValueError("Called asy() on an empty frame and no file to read. "
-                        "This is unlikely to end well.")
+    if _.text.strip() and name:
+      raise Exception("Called asy() with both a file name and inline text.  Which one should I compile?")
 
-    # If we don't have any text to compile, complain.
-    if self.content.strip() and name:
-        raise ValueError("Called asy() with both a file name and inline text. "
-                         "Which one should I compile?")
 
     # Figure out which format we should convert to.
     if latex_mode == 'latex':
-        fmt = 'eps'
+      fmt = 'eps'
     else:
-        fmt = 'pdf'
+      fmt = 'pdf'
 
     # Form the filenames.
     name_asy = ext(name, 'asy')
@@ -291,45 +243,41 @@ def asy(name=None, args=''):
 
     # Make sure we have a name and a file.
     if not name:
-        name = anonymous_name()
-        save(name_asy)
+      name = anon()
+      save(name_asy)
 
     # Check for any  dependencies (i.e. import ....)
-    deps = []
-    pattern = r'^\s*import\s+([a-zA-Z._-]*)\s*;'
-    for match in re.finditer(pattern, self.content, re.DOTALL):
-        dep_mod = ext(match.group(1), 'asy')
-        deps.append(dep_mod)
+    deps = list()
+    for match in re.finditer(r'^\s*import\s+([a-zA-Z._-]*)\s*;', _.text, re.DOTALL):
+      dep_mod = ext(match.group(1), 'asy')
+      deps.append(dep_mod)
 
     # If any of these files exist in any import directories, import them.  If
     # not, no big deal.
     imprt(*deps, conditional=True)
 
-    if x := recall(name_fmt, name_asy, *deps):
-        shell("asy %s -tex %s -f %s -o %s" % (name_asy, latex_mode, fmt, name_fmt), provides=x)
+    if not recall(name_fmt, name_asy, *deps):
+      shell("asy %s -tex %s -f %s -o %s" % (name_asy, latex_mode, fmt, name_fmt))
     push("\\includegraphics[%s]{%s}" % (args, name_fmt))
 
-def image(name_orig, args=''):
-    """Insert an image into the document, converting to a format that is
-    compatible with the selected latex_mode."""
+  def image(name_orig, args=''):
     if latex_mode == 'latex':
-        supported_fmts = ['eps']
-        target_fmt = 'eps'
+      supported_fmts = ['eps']
+      target_fmt = 'eps'
     else:
-        supported_fmts = ['pdf', 'png', 'jpg', 'jpeg']
-        target_fmt = 'pdf'
+      supported_fmts = ['pdf', 'png', 'jpg', 'jpeg']
+      target_fmt = 'pdf'
 
-    _, fmt = os.path.splitext(name_orig)
+    (base, fmt) = os.path.splitext(name_orig)
 
     # If the image we have is not in a supported format, convert it.
     name_tgt = ext(name_orig, target_fmt)
-    if fmt not in supported_fmts:
-        if x := recall(name_tgt, name_orig):
-            if fmt == '.svg' and target_fmt == 'pdf':
-                shell("inkscape %s --export-pdf=%s" % (name_orig, name_tgt), provides=x)
-            else:
-                shell("convert %s %s" % (name_orig, name_tgt), provides=x)
-
+    if fmt not in supported_fmts and not recall(name_tgt, name_orig):
+      if fmt == '.svg' and target_fmt == 'pdf':
+        shell("inkscape %s --export-pdf=%s" % (name_orig, name_tgt))
+      else:
+        shell("convert %s %s" % (name_orig, name_tgt))
+    
     # Insert the image into the document.
     push("\\includegraphics[%s]{%s}" % (args, name_tgt))
 
