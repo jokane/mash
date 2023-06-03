@@ -69,8 +69,6 @@ def latex(name, compiler=None, ignore_deps=None, keep_pdf=True, callback=None,
     deps = [item for item in deps if item not in ignore_deps]
     deps = [item for item in deps if not re.match('#.*', item)]
 
-    print(f'Deps for {name} are: {deps}')
-
     if x := recall(name+".pdf", *deps):
         # Run the compiler over and over until the log stops changing.
         last_log = ''
@@ -79,11 +77,11 @@ def latex(name, compiler=None, ignore_deps=None, keep_pdf=True, callback=None,
         callback_done = False
         compiles = 0
         while True:
+            compiles+=1
             try:
                 shell(f"{latex_mode} --shell-escape -interaction=batchmode "
                       f"-file-line-error -halt-on-error {name}", provides=x)
                 wait_for(x)
-                compiles+=1
             except subprocess.CalledProcessError as e:
                 with open(f'{name}.log', 'r', encoding='utf-8') as it:
                     e.stderr = it.read()

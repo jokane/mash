@@ -4,6 +4,7 @@
 # pylint: disable=unused-wildcard-import
 # pylint: disable=protected-access
 # pylint: disable=invalid-name
+# pylint: disable=too-many-lines
 
 
 """Tests for mash and mashlib.  Usually run via the check script, but can be
@@ -90,8 +91,8 @@ def fixture_start_in_temp_directory():
     yield from start_in_temp_directory()
 
 def start_in_temp_directory():
-    """All tests run with a "clean" temporary current directory, containing (a
-    symbolic link to) mashlib, and nothing else."""
+    """All tests run with a "clean" temporary current directory, containing
+    (symbolic links to) the standard library, and nothing else."""
 
     test_script_dir = os.path.dirname(os.path.abspath(__file__))
     linked_files = ['mashlib.mash', 'latex.mash']
@@ -683,6 +684,19 @@ def test_recall8():
     """
     engage_string(code)
 
+def test_push():
+    # Pushing frame contents.
+    code = """
+        [[[ include mashlib.mash ]]]
+        [[[
+            assert 'abc' in self.content
+        |||
+            [[[ push() ||| abc ]]]
+        ]]]
+    """
+    engage_string(code)
+
+
 def test_keep1():
     # Keeping a file.
     code = r"""
@@ -965,7 +979,7 @@ def test_latex2():
                 year = {1960}
             }
         ]]]
-        [[[ latex(name='paper', max_compiles=1) |||
+        [[[ latex(name='paper') |||
             \documentclass{article}
             \usepackage{graphicx}
             \begin{document}
@@ -982,8 +996,22 @@ def test_latex2():
         ]]]
     """
     engage_string(code)
-    os.system("evince paper.pdf")
     assert os.path.isfile('paper.pdf')
+
+def test_latex3():
+    # LaTeX errors are complained about.
+    code = r"""
+        [[[ include latex.mash ]]]
+        [[[ latex(name='paper') |||
+            \notactuallylatexcode 
+        ]]]
+    """
+    with pytest.raises(subprocess.CalledProcessError):
+        root = tree_from_string(code, 'dummy.mash')
+        run_tree(root)
+
+def test_latex4():
+    # LaTeX callbacks are called.
 
 if __name__ == '__main__':  #pragma: nocover
     run_tests_from_pattern(sys.argv[1])

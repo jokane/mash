@@ -497,7 +497,7 @@ def run_from_args(argv):
     def report_exception(e):
         print(e)
         def decode_and_print_if_not_empty(x):
-            x = x.decode("utf-8", errors='ignore')
+            x = x.decode("utf-8", errors='ignore') if isinstance(x, str) else x
             if len(x.strip()) > 0:
                 print(x)
         decode_and_print_if_not_empty(e.stdout)
