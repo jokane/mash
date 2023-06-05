@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+# pylint: disable=invalid-name
+
+"""A command line tool to run some code quality checks: pylint, pytest, and
+coverage.  Usually this would be a very small shell script, but some hacking
+is needed here to get pylint and coverage to correctly handle the simple mash
+files we have here."""
+
+import os
+import re
+import sys
+
+import coverage
+import test_mash3
+
+def full_check():
+    """Run everything."""
+    mashes_to_hack = [ 'mashlib3.mash', 'latex3.mash' ]
+    hacked_dir = '.hacked'
+    hack_map = {}
+
+    # For each mash file on our list, its contents, remove the [[[, |||,
+    # and ]]], and save the result as a temporary Python file.
+    def hack_mash(mash_filename):
+        path, basename = os.path.split(mash_filename)
+        root, _ = os.path.splitext(basename)
+        py_filename = os.path.join(path, hacked_dir, root + '.py')
+
+        with open(mash_filename, 'r', encoding='utf-8') as mash_file:
+            mash_code = mash_file.read()
+
+        py_code = mash_code
+        py_code = re.sub(r'\[\[\[\s?include\s+mashlib3.mash\s?]]]',
+                          'from mashlib3 import * #pragma nocover', py_code)
+        py_code = re.sub(r'\[\[\[', '', py_code)
+        py_code = re.sub(r'\|\|\|', '', py_code)
+        py_code = re.sub(r'\]\]\]', '', py_code)
+        py_code = py_code.rstrip()
+
+        with open(py_filename, 'w', encoding='utf-8') as py_file:
+            print(py_code, file=py_file)
+
+        hack_map[mash_filename] = py_filename
+
+    if not os.path.exists(hacked_dir):
+        os.makedirs(hacked_dir)
+
+    for mash_filename in mashes_to_hack:
+        hack_mash(mash_filename)
+
+    # Modify the internals of coverage.py to read from the hacked python
+    # files instead of the original mashes.
+    old_gps = coverage.python.get_python_source
+    def new_gps(filename):
+        path, basename = os.path.split(filename)
+        if basename in hack_map:
+            basename = hack_map[basename]
+            filename = os.path.join(path, basename)
+        return old_gps(filename)
+    coverage.python.get_python_source = new_gps
+
+    # Ready, at last, to actually check things out.
+    # - pylint
+    command = f'pylint -j0 *.py {__file__} {hacked_dir}/*.py'
+    for mash, py in hack_map.items():
+        sed_pat = re.sub(r'/', r'\/', py)
+        command += rf'| sed -e s"/{sed_pat}/{mash}/"'
+    os.system(command)
+
+    # - pytest with coverage tracing
+    os.system('coverage run --omit=/usr*,/opt*,*dummy* -m pytest')
+
+    # - coverage report
+    cov = coverage.Coverage()
+    cov.load()
+    cov.report(show_missing=True, omit=['/usr*', '/opt*', '*dummy*'])
+
+if __name__ == '__main__':
+    if len(sys.argv) == 1:
+        full_check()
+    else:
+        for pattern in sys.argv[1:]:
+            test_mash3.run_tests_from_pattern(pattern)
