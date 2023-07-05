@@ -1081,6 +1081,35 @@ def test_latex7():
     assert os.path.isfile('.mash/paper.dvi')
     assert os.path.isfile('.mash/paper.pdf')
 
+def test_latex8():
+    # Strict checking finds reference problems.
+    code = r"""
+        [[[ include latex3.mash ]]]
+        [[[ latex(name='paper', strict=True) |||
+            \documentclass{article}
+            \begin{document}
+                \ref{missing}
+            \end{document}
+        ]]]
+    """
+    with pytest.raises(Exception):
+        root = tree_from_string(code, 'dummy.mash')
+        run_tree(root)
+
+def test_latex9():
+    # Strict checking with no problems does not complain.
+    code = r"""
+        [[[ include latex3.mash ]]]
+        [[[ latex(name='paper', strict=True) |||
+            \documentclass{article}
+            \begin{document}
+                hi
+            \end{document}
+        ]]]
+    """
+    engage_string(code)
+
+
 
 
 if __name__ == '__main__':  #pragma: nocover

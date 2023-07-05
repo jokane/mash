@@ -100,7 +100,8 @@ def latex(name, compiler=None, ignore_deps=None, keep_pdf=True, callback=None,
                 with open(f'{name}.aux', 'r', encoding='utf-8') as it:
                     aux = it.read()
                 if re.search(r'\\citation', aux):
-                    shell("bibtex -terse %s" % name).result()
+                    shell(f"bibtex -terse {name}", provides = [ f'{name}.bbl' ])
+                    wait_for(f'{name}.bbl')
                     bibtex_done = True
 
             if not makeindex_done and os.path.isfile(name+".idx"):
@@ -123,13 +124,11 @@ def latex(name, compiler=None, ignore_deps=None, keep_pdf=True, callback=None,
         if strict:
             complaints = check_latex_log(log)
             if complaints:
-                # Found something wrong.  Remove the output to ensure that the next
-                # build will try to compile again.  Then complain.
+                # Found something wrong.  Complain about it.
                 os.remove(name+".pdf")
                 raise Exception(complaints)
 
     if keep_pdf:
-        os.system('ls -l')
         keep(name+".pdf")
 
 def check_latex_log(log):

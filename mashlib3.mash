@@ -137,9 +137,11 @@ def shell(command, stdin=None, check=True, provides=None):
                                            stdout=subprocess.PIPE,
                                            stderr=subprocess.PIPE,
                                            timeout=60000)
+
         usage_after = resource.getrusage(resource.RUSAGE_CHILDREN)
         completed_process.user_time = usage_after.ru_utime - usage_before.ru_utime
         completed_process.sys_time = usage_after.ru_stime - usage_before.ru_stime
+
         return completed_process
 
     future = job_executor.submit(run_job)
@@ -152,8 +154,11 @@ def wait_for(res):
     """Wait for shell process creating the named resource to complete.
     Return its CompletedProcess.  Or, if an exception occured in the
     process, raise it."""
+    if res not in resource_futures:
+        raise ValueError(f'Cannot wait for resource {res} because it is not being built.')
     future = resource_futures[res]
-    return future.result()
+    completed_process = future.result()
+    return completed_process
 
 def save(target, contents=None):
     """Ensure that the given text (default: current contents of this frame)
@@ -341,10 +346,11 @@ def shell_filter(command):
 
 def before_code_hook():
     """Executed for each code leaf before executing it.  For things like
-    "[at][at]abc/xyz", import that file and replace with "xyz".  Note the need
-    to avoid putting two @ symbols together here, because this code might run
-    on itself.  Look for these things both in the code itself and in the text
-    it will operate on."""
+    "[at][at]abc/xyz", import that file and replace with "xyz".
+
+    Note the need to avoid putting two @ symbols together here, because this
+    code might run on itself.  Look for these things both in the code itself
+    and in the text it will operate on."""
 
     def import_and_mangle(match):
         fr = match.group(1)
