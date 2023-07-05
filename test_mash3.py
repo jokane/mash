@@ -1169,5 +1169,116 @@ def test_dot3():
     """
     engage_string(code)
 
+def test_xfig1():
+    # Complain about both including and excluding depths.
+    code = r"""
+        [[[ include latex3.mash ]]]
+        [[[
+            xfig('irrelevant.fig', include_depths=[1,2,3], exclude_depths=[4,5,6])
+        ]]]
+    """
+    with pytest.raises(ValueError):
+        engage_string(code)
+
+def test_xfig2():
+    # Locate dependendies in xfig.
+    code = r"""
+        [[[ include latex3.mash ]]]
+        [[[ unindent(); self.content=self.content.strip(); save('picture.fig') |||
+            #FIG 3.2  Produced by xfig version 3.2.5b
+            Landscape
+            Center
+            Inches
+            Letter  
+            100.00
+            Single
+            -2
+            1200 2
+            2 5 0 1 0 -1 45 -1 20 0.000 0 0 -1 0 0 5
+              0 image.png
+               780 -1071 920 -1071 920 -931 780 -931 780 -1071
+        ]]]
+        [[[
+            xfig('picture.fig')
+        ]]]
+    """
+    os.system('touch image.png')
+    engage_string(code)
+
+def test_xfig3():
+    # No complaints from xfig with include or exclude lists
+    # nor with latex_mode='latex'
+    code = r"""
+        [[[ include latex3.mash ]]]
+        [[[ unindent(); self.content=self.content.strip(); save('box.fig') |||
+            #FIG 3.2  Produced by xfig version 3.2.5b
+            Landscape
+            Center
+            Inches
+            Letter  
+            100.00
+            Single
+            -2
+            1200 2
+            2 2 0 1 0 7 50 -1 -1 0.000 0 0 -1 0 0 5
+               4590 765 8685 765 8685 3285 4590 3285 4590 765
+        ]]]
+        [[[
+            latex_mode = 'latex'
+            xfig('box.fig', include_depths=50)
+            xfig('box.fig', include_depths=[50])
+            xfig('box.fig', exclude_depths=[50])
+        ]]]
+    """
+    engage_string(code)
+
+def test_xfig4():
+    # Complain about includegraphics args in direct mode.
+    code = r"""
+        [[[ include latex3.mash ]]]
+        [[[ unindent(); self.content=self.content.strip(); save('box.fig') |||
+            #FIG 3.2  Produced by xfig version 3.2.5b
+            Landscape
+            Center
+            Inches
+            Letter  
+            100.00
+            Single
+            -2
+            1200 2
+            2 2 0 1 0 7 50 -1 -1 0.000 0 0 -1 0 0 5
+               4590 765 8685 765 8685 3285 4590 3285 4590 765
+        ]]]
+        [[[
+            xfig('box.fig', direct=True, args='width=2in')
+        ]]]
+    """
+    with pytest.raises(ValueError):
+        engage_string(code)
+
+def test_xfig5():
+    # No complaints from xfig in indirect mode.
+    code = r"""
+        [[[ include latex3.mash ]]]
+        [[[ unindent(); self.content=self.content.strip(); save('box.fig') |||
+            #FIG 3.2  Produced by xfig version 3.2.5b
+            Landscape
+            Center
+            Inches
+            Letter  
+            100.00
+            Single
+            -2
+            1200 2
+            2 2 0 1 0 7 50 -1 -1 0.000 0 0 -1 0 0 5
+               4590 765 8685 765 8685 3285 4590 3285 4590 765
+        ]]]
+        [[[
+            xfig('box.fig', direct=False, args='width=2in')
+        ]]]
+    """
+    engage_string(code)
+
+
 if __name__ == '__main__':  #pragma: nocover
     run_tests_from_pattern(sys.argv[1])

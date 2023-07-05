@@ -248,21 +248,21 @@ def xfig(fname_fig, args='', direct=True, include_depths=None, exclude_depths=No
         # Convert to the two part pdf/latex or ps/latex form.  Typesets using
         # LaTeX, but cannot accept includegraphics arguments.
         if args != '':
-            raise Exception("Don't know what to do with args in xfig() with "
+            raise ValueError("Don't know what to do with args in xfig() with "
                             r"direct=True.  Maybe wrap in a \resizebox instead?")
 
         if x := recall(fname_fmt, fname_fig, *deps):
             shell("fig2dev -L %stex %s -O %s > %s"
-                  % (shfmt, fig2dev_args, fname_fig, fname_fmt), provides=x)
+                  % (shfmt, fig2dev_args, fname_fig, fname_fmt), provides=x).result()
         if x:= recall(fname_tex, fname_fig, *deps):
             shell("fig2dev -L %stex_t %s -p %s %s > %s"
-                  % (shfmt, fig2dev_args, fname_fmt, fname_fig, fname_tex), provides=x)
+                  % (shfmt, fig2dev_args, fname_fmt, fname_fig, fname_tex), provides=x).result()
         push(r"\input{%s}" % (fname_tex, ))
     else:
         # Convert directly to an external format that can be inserted with
         # \includegraphics.  Does not typeset labels with LaTeX.
         if x := recall(fname_fmt, fname_fig, *deps):
-            shell("fig2dev -L %s %s %s %s" % (fmt, fig2dev_args, fname_fig, fname_fmt), provides=x)
+            shell(f"fig2dev -L {fmt} {fig2dev_args} {fname_fig} {fname_fmt}", provides=x).result()
         push(r"\includegraphics[%s]{%s}" % (args, fname_fmt))
 
 def asy(name=None, args=''):

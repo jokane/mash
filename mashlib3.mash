@@ -393,6 +393,21 @@ def push(text = None):
     self.result.append(TextLeaf(leaf.address, self.parent, text))
 
 
+def unindent():
+    """ Modify each line of the current frame, removing the whitespace that
+    appears at the start of the first line."""
+
+    # Find the prefix that we want to remove.  It is the sequence
+    # of tabs or spaces that preceeds the first real character.
+    match = re.search(r'([ \t]*)[^ \t\n]', self.content, re.M)
+
+    # If we found a prefix, remove it from the start of every line.
+    if match:
+        prefix = match.group(1)
+        self.content = re.sub('\n' + prefix, '\n', self.content)
+        self.content = re.sub('^' + prefix, '', self.content)
+
+
 def at_end():
     """Executed automatically at the end of the run.  Finishes outstanding
     jobs and raises and exceptions that we've been saving up."""
