@@ -91,8 +91,11 @@ def latex(name, compiler=None, ignore_deps=None, keep_pdf=True, callback=None,
 
             with open(f'{name}.log', 'r', encoding='utf-8') as it:
                 log = it.read()
+
             if not callback_done and callable(callback):
                 callback()
+                callback_done = True
+
             if not bibtex_done:
                 with open(f'{name}.aux', 'r', encoding='utf-8') as it:
                     aux = it.read()

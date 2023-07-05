@@ -1012,7 +1012,25 @@ def test_latex3():
 
 def test_latex4():
     # LaTeX callbacks are called.
-    pass
+    code = r"""
+        [[[ include latex3.mash ]]]
+        [[[
+            called = False
+            def cb():
+                global called
+                called = True
+        ]]]
+        [[[ latex(name='paper', callback=cb) |||
+            \documentclass{article}
+            \begin{document}
+                hi
+            \end{document}
+        ]]]
+        [[[
+            assert called
+        ]]]
+    """
+    engage_string(code)
 
 if __name__ == '__main__':  #pragma: nocover
     run_tests_from_pattern(sys.argv[1])
