@@ -1279,6 +1279,59 @@ def test_xfig5():
     """
     engage_string(code)
 
+def test_asy1():
+    # Complain about calling asy() with no input.
+    code = r"""
+        [[[ include latex3.mash ]]]
+        [[[ asy() ]]]
+    """
+    with pytest.raises(ValueError):
+        engage_string(code)
+
+def test_asy2():
+    # No complaints from normal asy().
+    code = r"""
+        [[[ include latex3.mash ]]]
+        [[[ save('test.asy') |||
+            draw((3,5)--(7,5));
+        ]]]
+        [[[ asy('test.asy') ]]]
+    """
+    engage_string(code)
+
+def test_asy3():
+    # Complain about asy() with inconsistent inputs.
+    code = r"""
+        [[[ include latex3.mash ]]]
+        [[[ asy('test.asy') |||
+            draw((3,5)--(7,5));
+        ]]]
+    """
+    with pytest.raises(ValueError):
+        engage_string(code)
+
+def test_asy4():
+    # No complaints from asy() with latex_mode == 'latex'.
+    code = r"""
+        [[[ include latex3.mash ]]]
+        [[[ latex_mode = 'latex' ]]]
+        [[[ asy() |||
+            draw((3,5)--(7,5));
+        ]]]
+    """
+    engage_string(code)
+
+def test_asy5():
+    # Find asymptote imports correctly.
+    code = r"""
+        [[[ include latex3.mash ]]]
+        [[[ latex_mode = 'latex' ]]]
+        [[[ asy() |||
+            import graph;
+            draw((3,5)--(7,5));
+        ]]]
+    """
+    engage_string(code)
 
 if __name__ == '__main__':  #pragma: nocover
     run_tests_from_pattern(sys.argv[1])

@@ -284,13 +284,18 @@ def asy(name=None, args=''):
     else:
         fmt = 'pdf'
 
+
+    # Make sure we have a name and a file.
+    save_file = False
+    if not name:
+        name = anonymous_name()
+        save_file = True
+
     # Form the filenames.
     name_asy = ext(name, 'asy')
     name_fmt = ext(name, fmt)
 
-    # Make sure we have a name and a file.
-    if not name:
-        name = anonymous_name()
+    if save_file:
         save(name_asy)
 
     # Check for any  dependencies (i.e. import ....)
