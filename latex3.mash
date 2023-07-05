@@ -178,7 +178,7 @@ def dot(name=None, via_xfig=False, xfig_direct=True, args=''):
     save(name_dot)
     if via_xfig:
         if x := recall(name_fig, name_dot):
-            shell("dot -Tfig %s > %s" % (name_dot, name_fig), provides=x)
+            shell("dot -Tfig %s > %s" % (name_dot, name_fig), provides=x).result()
         xfig(name_fig, args, direct=xfig_direct)
     else:
         if x := recall(name_fmt, name_dot):

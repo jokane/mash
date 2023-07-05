@@ -1131,6 +1131,43 @@ def test_dot1():
         root = tree_from_string(code, 'dummy.mash')
         run_tree(root)
 
+def test_dot2():
+    # Compile dot with latex_mode="latex".
+    code = r"""
+        [[[ include latex3.mash ]]]
+        [[[ latex_mode = 'latex' ]]]
+        [[[ latex(name='paper') |||
+            \documentclass{article}
+            \usepackage{graphicx}
+            \begin{document}
+                [[[ dot() |||
+                    graph{
+                        A -- B
+                    }
+                ]]]
+            \end{document}
+        ]]]
+    """
+    engage_string(code)
+
+def test_dot3():
+    # Compile dot via xfig.
+    code = r"""
+        [[[ include latex3.mash ]]]
+        [[[ latex(name='paper') |||
+            \documentclass{article}
+            \usepackage{graphicx}
+            \usepackage{color}
+            \begin{document}
+                [[[ dot(via_xfig=True) |||
+                    graph{
+                        A -- B
+                    }
+                ]]]
+            \end{document}
+        ]]]
+    """
+    engage_string(code)
 
 if __name__ == '__main__':  #pragma: nocover
     run_tests_from_pattern(sys.argv[1])
