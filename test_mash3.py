@@ -1032,5 +1032,56 @@ def test_latex4():
     """
     engage_string(code)
 
+def test_latex5():
+    # LaTeX document with an index is compiled correctly.
+    code = r"""
+        [[[ include latex3.mash ]]]
+        [[[ latex(name='paper') |||
+            \documentclass{article}
+            \usepackage{makeidx}
+            \makeindex
+            \begin{document}
+                hi
+                \index{hi}
+                \printindex
+            \end{document}
+        ]]]
+    """
+    engage_string(code)
+    assert os.path.isfile('.mash/paper.idx')
+    assert os.path.isfile('.mash/paper.ind')
+    assert os.path.isfile('.mash/paper.ilg')
+
+def test_latex6():
+    # LaTeX respects max_compiles argument.
+    code = r"""
+        [[[ include latex3.mash ]]]
+        [[[ latex(name='paper', max_compiles=1) |||
+            \documentclass{article}
+            \begin{document}
+                hi
+            \end{document}
+        ]]]
+    """
+    engage_string(code)
+
+def test_latex7():
+    # LaTeX via dvi gives a PDF.
+    code = r"""
+        [[[ include latex3.mash ]]]
+        [[[ latex_mode = 'latex' ]]]
+        [[[ latex(name='paper') |||
+            \documentclass{article}
+            \begin{document}
+                hi
+            \end{document}
+        ]]]
+    """
+    engage_string(code)
+    assert os.path.isfile('.mash/paper.dvi')
+    assert os.path.isfile('.mash/paper.pdf')
+
+
+
 if __name__ == '__main__':  #pragma: nocover
     run_tests_from_pattern(sys.argv[1])
