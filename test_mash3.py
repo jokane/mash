@@ -1110,6 +1110,15 @@ def test_latex9():
     engage_string(code)
 
 
+def test_dot1():
+    # Complain about dot on an empty frame.
+    code = r"""
+        [[[ include latex3.mash ]]]
+        [[[ dot() ]]]
+    """
+    with pytest.raises(ValueError):
+        root = tree_from_string(code, 'dummy.mash')
+        run_tree(root)
 
 
 if __name__ == '__main__':  #pragma: nocover
