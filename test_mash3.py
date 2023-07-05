@@ -450,9 +450,9 @@ def test_mashlib_shell6():
         engage_string(code)
 
 def test_mashlib_shell_wait():
-    # Events are set.  Using a string for provides is handled as a single
-    # thing, instead of iterating over characters.  Calling wait_for allows
-    # the process to complete.
+    # Using a string for provides is handled as a single thing, instead of
+    # iterating over characters.  Calling wait_for allows the process to
+    # complete.
     code = r"""
         [[[
             [[[ include mashlib3.mash ]]]
@@ -467,6 +467,17 @@ def test_mashlib_shell_wait():
     root = tree_from_string(code, 'dummy.mash')
     root.execute(variables)
     assert list(variables['resource_futures']) == [ 'files.txt' ]
+
+def test_mashlib_wait_for1():
+    # Waiting for a non-existent resource causes an exception.
+    code = r"""
+        [[[ include mashlib3.mash ]]]
+        [[[ wait_for('broken') ]]]
+    """
+    with pytest.raises(ValueError):
+        engage_string(code)
+
+
 
 def test_subprocess_max_jobs():
     # The max_jobs setting actually limits the number of parallel shell jobs
