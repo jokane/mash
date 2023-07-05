@@ -103,9 +103,6 @@ def latex(name, compiler=None, ignore_deps=None, keep_pdf=True, callback=None,
                     future = shell("bibtex -terse %s" % name)
                     future.result()
                     bibtex_done = True
-                if re.search(r'cite', aux):
-                    shell("biber %s" % name)
-                    bibtex_done = True
 
             if not makeindex_done and os.path.isfile(name+".idx"):
                 shell("makeindex %s.idx" % name)
