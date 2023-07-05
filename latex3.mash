@@ -331,7 +331,7 @@ def image(name_orig, args=''):
         if x := recall(name_tgt, name_orig):
             if fmt == '.svg' and target_fmt == 'pdf':
                 shell("inkscape %s --export-pdf=%s" % (name_orig, name_tgt), provides=x)
-            else:
+            elif name_orig != name_tgt:
                 shell("convert %s %s" % (name_orig, name_tgt), provides=x)
 
     # Insert the image into the document.

@@ -1333,5 +1333,48 @@ def test_asy5():
     """
     engage_string(code)
 
+def test_image1():
+    # Insert an image normally, with no conversion.
+    code = r"""
+        [[[ include latex3.mash ]]]
+        [[[ image('irrelevant.pdf') ]]]
+    """
+    engage_string(code)
+
+def test_image2():
+    # Insert an image with latex_mode='latex' and normal conversion.
+    code = r"""
+        [[[ include latex3.mash ]]]
+        [[[ latex_mode = 'latex' ]]]
+        [[[ save('box.svg') |||
+            <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+            <svg width="210mm" height="297mm">
+              <g>
+                <rect width="30.170412" height="30" x="42" y="42" />
+              </g>
+            </svg>
+        ]]]
+        [[[ image('box.svg') ]]]
+    """
+    engage_string(code)
+
+def test_image3():
+    # Insert an image with conversion from SVG to PDF.  (This pair is a special
+    # case that goes via inkscape.)
+    code = r"""
+        [[[ include latex3.mash ]]]
+        [[[ save('box.svg') |||
+            <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+            <svg width="210mm" height="297mm">
+              <g>
+                <rect width="30.170412" height="30" x="42" y="42" />
+              </g>
+            </svg>
+        ]]]
+        [[[ image('box.svg') ]]]
+    """
+    engage_string(code)
+
+
 if __name__ == '__main__':  #pragma: nocover
     run_tests_from_pattern(sys.argv[1])
