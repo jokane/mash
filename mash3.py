@@ -68,10 +68,10 @@ class Address:
     def __str__(self):
         return f'({self.filename}, line {self.lineno}, offset {self.offset})'
 
-    def exception(self, message):
+    def exception(self, message, type_=ValueError):
         """Something went wrong at this address.  Complain, mentioning the
         address."""
-        exception = ValueError(f'{self}: {message}')
+        exception = type_(f'{self}: {message}')
         exception.filename = self.filename
         exception.lineno = self.lineno
         exception.offset = self.offset
@@ -281,7 +281,20 @@ class IncludeLeaf(FrameTreeLeaf):
         """Load the file and execute it."""
         self.announce(variables)
 
-        with open(self.content, 'r', encoding='utf-8') as input_file:
+        ok = False
+
+        look_in = [ original_cwd ] + sys.path
+        for directory in look_in:
+            x = os.path.join(directory, self.content)
+            if os.path.exists(x):
+                print(x)
+                ok = True
+                break
+
+        if not ok:
+              self.address.exception("Trying to include %s, but could not find it in any of these places:\n%s" % (self.content, '\n'.join(look_in)))
+
+        with open(x, 'r', encoding='utf-8') as input_file:
             text = input_file.read()
 
         root = tree_from_string(text, self.content)
@@ -526,6 +539,7 @@ def run_from_args(argv):
 
 def engage(argv):
     """ Main entry point."""
+    global original_cwd
     done = False
     original_cwd = os.getcwd()
     while not done:

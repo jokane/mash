@@ -14,6 +14,7 @@ start."""
 
 
 import concurrent.futures
+import filecmp
 import glob
 import hashlib
 import os
@@ -104,58 +105,63 @@ def check_for_executable(exe):
         raise ValueError(f'Executable {exe} not found in path.')
     executables_checked.add(exe)
 
-def shell(command, stdin=None, check=True, provides=None):
-    """Execute the given command asyncronously in a shell.  Raise
-    subprocess.CalledProcessError if the command gives a non-zero return
-    code.  Return a future, which when completed results in
-    CompletedProcess object, which has stdout and stderr attributes.  In
-    addition, this object has attributes tacked on to it showing the user
-    time and system time consumed, as reported by getrusage."""
-
+def job(provides, func, *args):
+    """ Call the given function asyncronously in a shell.  Track which files
+    this command "provides", to potentially wait_for them later."""
     global job_executor
 
     if job_executor is None:
         job_executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_jobs)
-
-    if check:
-        check_for_executable(command.split(' ')[0])
-
-    print("  ", command)
 
     if provides is None:
         provides = []
     if isinstance(provides, str):
         provides = [ provides ]
 
-    def run_job():
-        usage_before = resource.getrusage(resource.RUSAGE_CHILDREN)
+    future = job_executor.submit(func, *args)
+    print(f"  [{func.__name__}] {args}")
 
-        completed_process = subprocess.run(command,
-                                           shell=True,
-                                           check=True,
-                                           input=stdin,
-                                           stdout=subprocess.PIPE,
-                                           stderr=subprocess.PIPE,
-                                           timeout=60000)
 
-        usage_after = resource.getrusage(resource.RUSAGE_CHILDREN)
-        completed_process.user_time = usage_after.ru_utime - usage_before.ru_utime
-        completed_process.sys_time = usage_after.ru_stime - usage_before.ru_stime
-
-        return completed_process
-
-    future = job_executor.submit(run_job)
     for res in provides:
         resource_futures[res] = future
     all_futures.append(future)
-    return future
+
+
+def shell(command, stdin=None, check=True):
+    """Execute the given command asyncronously in a shell.  Raise
+    subprocess.CalledProcessError if the command gives a non-zero return code.
+    Return a future, which when completed results in CompletedProcess object,
+    which has stdout and stderr attributes.  In addition, this object has
+    attributes tacked on to it showing the user time and system time consumed,
+    as reported by getrusage."""
+
+    if check:
+        check_for_executable(command.split(' ')[0])
+    
+    print('  ', command)
+
+    usage_before = resource.getrusage(resource.RUSAGE_CHILDREN)
+
+    completed_process = subprocess.run(command,
+                                       shell=True,
+                                       check=True,
+                                       input=stdin,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.PIPE,
+                                       timeout=60000)
+
+    usage_after = resource.getrusage(resource.RUSAGE_CHILDREN)
+    completed_process.user_time = usage_after.ru_utime - usage_before.ru_utime
+    completed_process.sys_time = usage_after.ru_stime - usage_before.ru_stime
+
+    return completed_process
 
 def wait_for(res):
     """Wait for shell process creating the named resource to complete.
     Return its CompletedProcess.  Or, if an exception occured in the
     process, raise it."""
     if res not in resource_futures:
-        raise ValueError(f'Cannot wait for resource {res} because it is not being built.')
+        raise ValueError(f'Cannot wait for resource {res} because it is not being built.  These are the resources being built:' + '\n'.join(resource_futures.keys()))
     future = resource_futures[res]
     completed_process = future.result()
     return completed_process
@@ -204,8 +210,8 @@ def recall(target, *sources):
     """If any of the sources are being built by an active shell job, wait
     until that shell job finishes.  Then check whether the given target file
     exists in the archive directory, and if so, if it's newer than all of the
-    given sources.  If so, copy it over and return the target.  If not, do
-    nothing and return None."""
+    given sources.  If so, copy it over and return the True.  If not, do
+    nothing and return False."""
 
     archive_target = os.path.join(archive_directory, target)
 
@@ -248,25 +254,45 @@ def recall(target, *sources):
             if os.path.exists(target):
                 shutil.rmtree(target)
             shutil.copytree(archive_target, os.path.join(build_directory, target))
-        return None
+        return True
     else:
-        return target
+        return False
 
-def keep(file_to_keep):
-    """Copy a file or directory from the working directory to
-    the keep directory."""
+def keep(file_to_keep, target=None):
+    """Copy a file or directory from the working directory to the keep
+    directory.  Possibly rename it or put it in a subdirectory."""
+
+    # Sanity check: Is the keep directory set reasonably?
     if not os.path.isabs(keep_directory):
         raise ValueError(f'Keep directory ({keep_directory}) is a relative path. '
                         f'This would be interpreted relative to the build directory ',
                         f'({build_directory}).  This almost certainly not what you want. '
                         f'Use an absolute path for keep_directory instead.')
 
-    if not os.path.exists(keep_directory):
-        os.makedirs(keep_directory)
+    # What should the destination be?
+    if target is None:
+        target = file_to_keep
+    target = os.path.join(keep_directory, target)
+
+    print('keep: ', file_to_keep, target)
+
+    # Make sure the destintation directory exists.  Note that we can't just
+    # check for the keep directory itself, because the target might be in a
+    # subdirectory.
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+
+    # Make sure the destintation directory exists.  Note that we can't just
+    # check for the keep directory itself, because the target might be in a
+    # subdirectory.
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+
+    # Actually copy it to the keep directory.  One might be tempted to move the
+    # files instead of copying at this point, but that won't work --- we need
+    # the original copies in .mash, so they'll be in .mash-archive next time,
+    # so that we can tell if things need to be re-built.
     if os.path.isfile(file_to_keep):
-        shutil.copy2(file_to_keep, keep_directory)
+        shutil.copy2(file_to_keep, target)
     elif os.path.isdir(file_to_keep):
-        target = os.path.join(keep_directory, file_to_keep)
         if os.path.exists(target):
             shutil.rmtree(target)
         shutil.copytree(file_to_keep, target)
@@ -361,7 +387,7 @@ def before_code_hook():
     self.content = re.sub(regex, import_and_mangle, self.content)
 
 def spell_check(command='aspell'):
-    """Run aspell or another equivalent comment on every file with a .mash
+    """Run aspell or another equivalent command on every file with a .mash
     extension in the original directory.  Restart the mash process if any of
     the files change in that process."""
 
@@ -369,8 +395,8 @@ def spell_check(command='aspell'):
     for filename in sorted(glob.glob(os.path.join(original_directory, '*.mash'))):
         with open(filename, 'r', encoding='utf-8') as it:
             contents_before = it.read()
-        os.system(f"{command} check --home-dir={original_directory}"
-                  f"--keymapping ispell {filename}")
+        full_command = f"{command} check --home-dir={original_directory} --keymapping ispell {filename}"
+        os.system(full_command)
         with open(filename, 'r', encoding='utf-8') as it:
             contents_after = it.read()
         if contents_before != contents_after:
@@ -408,12 +434,23 @@ def unindent():
         self.content = re.sub('^' + prefix, '', self.content)
 
 
+def root_node():
+    node = self
+    while node.parent is not None:
+        node = node.parent
+    return node
+
+def root_mash_name():
+    return root_node().address.filename
+
+def root_name():
+    return re.sub(".mash", "", root_mash_name())
+
 def at_end():
     """Executed automatically at the end of the run.  Finishes outstanding
     jobs and raises and exceptions that we've been saving up."""
     # Finish up any jobs that are still running.
     exceptions = []
-    print(f'At end there are {len(all_futures)} futures.')
     for future in all_futures:
         try:
             future.result()
