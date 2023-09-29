@@ -179,7 +179,7 @@ class Frame(FrameTreeNode):
         self.content = ''
         for child in self.children:
             if isinstance(child, TextLeaf):
-                self.content += child.content
+                self.content += str(child.content)
             else:
                 new_children.append(child)
         self.children = new_children

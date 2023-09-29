@@ -39,7 +39,6 @@ def latex(name, compiler=None, ignore_deps=None, keep_pdf=True, callback=None,
 
     # Write the document.
     save(name + ".tex")
-    print(self.content)
 
     # Build a list of dependencies.
 
@@ -70,7 +69,7 @@ def latex(name, compiler=None, ignore_deps=None, keep_pdf=True, callback=None,
     deps = [item for item in deps if item not in ignore_deps]
     deps = [item for item in deps if not re.match('#.*', item)]
 
-    if x := recall(name+".pdf", *deps):
+    if not recall(name+".pdf", *deps):
         # Run the compiler over and over until the log stops changing.
         last_log = ''
         bibtex_done = False
@@ -81,8 +80,7 @@ def latex(name, compiler=None, ignore_deps=None, keep_pdf=True, callback=None,
             compiles+=1
             try:
                 shell(f"{latex_mode} --shell-escape -interaction=batchmode "
-                      f"-file-line-error -halt-on-error {name}", provides=x)
-                wait_for(x)
+                      f"-file-line-error -halt-on-error {name}")
             except subprocess.CalledProcessError as e:
                 with open(f'{name}.log', 'r', encoding='utf-8') as it:
                     e.stderr = it.read()
@@ -100,8 +98,7 @@ def latex(name, compiler=None, ignore_deps=None, keep_pdf=True, callback=None,
                 with open(f'{name}.aux', 'r', encoding='utf-8') as it:
                     aux = it.read()
                 if re.search(r'\\citation', aux):
-                    shell(f"bibtex -terse {name}", provides = [ f'{name}.bbl' ])
-                    wait_for(f'{name}.bbl')
+                    shell(f"bibtex -terse {name}")
                     bibtex_done = True
 
             if not makeindex_done and os.path.isfile(name+".idx"):
@@ -177,12 +174,12 @@ def dot(name=None, via_xfig=False, xfig_direct=True, args=''):
     name_fmt = ext(name, fmt)
     save(name_dot)
     if via_xfig:
-        if x := recall(name_fig, name_dot):
-            shell("dot -Tfig %s > %s" % (name_dot, name_fig), provides=x).result()
+        if not recall(name_fig, name_dot):
+            shell("dot -Tfig %s > %s" % (name_dot, name_fig))
         xfig(name_fig, args, direct=xfig_direct)
     else:
-        if x := recall(name_fmt, name_dot):
-            shell("dot -T%s %s > %s" % (fmt, name_dot, name_fmt), provides=x)
+        if not recall(name_fmt, name_dot):
+            shell("dot -T%s %s > %s" % (fmt, name_dot, name_fmt))
         push("\\includegraphics[%s]{%s}" % (args, name_fmt))
 
 def xfig(fname_fig, args='', direct=True, include_depths=None, exclude_depths=None):
@@ -251,18 +248,16 @@ def xfig(fname_fig, args='', direct=True, include_depths=None, exclude_depths=No
             raise ValueError("Don't know what to do with args in xfig() with "
                             r"direct=True.  Maybe wrap in a \resizebox instead?")
 
-        if x := recall(fname_fmt, fname_fig, *deps):
-            shell("fig2dev -L %stex %s -O %s > %s"
-                  % (shfmt, fig2dev_args, fname_fig, fname_fmt), provides=x).result()
-        if x:= recall(fname_tex, fname_fig, *deps):
-            shell("fig2dev -L %stex_t %s -p %s %s > %s"
-                  % (shfmt, fig2dev_args, fname_fmt, fname_fig, fname_tex), provides=x).result()
+        if not recall(fname_fmt, fname_fig, *deps):
+            shell("fig2dev -L %stex %s -O %s > %s" % (shfmt, fig2dev_args, fname_fig, fname_fmt))
+        if not recall(fname_tex, fname_fig, *deps):
+            shell("fig2dev -L %stex_t %s -p %s %s > %s" % (shfmt, fig2dev_args, fname_fmt, fname_fig, fname_tex))
         push(r"\input{%s}" % (fname_tex, ))
     else:
         # Convert directly to an external format that can be inserted with
         # \includegraphics.  Does not typeset labels with LaTeX.
-        if x := recall(fname_fmt, fname_fig, *deps):
-            shell(f"fig2dev -L {fmt} {fig2dev_args} {fname_fig} {fname_fmt}", provides=x).result()
+        if not recall(fname_fmt, fname_fig, *deps):
+            shell(f"fig2dev -L {fmt} {fig2dev_args} {fname_fig} {fname_fmt}")
         push(r"\includegraphics[%s]{%s}" % (args, fname_fmt))
 
 def asy(name=None, args=''):
@@ -309,8 +304,8 @@ def asy(name=None, args=''):
     # not, no big deal.
     imprt(*deps, conditional=True)
 
-    if x := recall(name_fmt, name_asy, *deps):
-        shell("asy %s -tex %s -f %s -o %s" % (name_asy, latex_mode, fmt, name_fmt), provides=x)
+    if not recall(name_fmt, name_asy, *deps):
+        shell("asy %s -tex %s -f %s -o %s" % (name_asy, latex_mode, fmt, name_fmt))
     push("\\includegraphics[%s]{%s}" % (args, name_fmt))
 
 def image(name_orig, args=''):
@@ -328,11 +323,11 @@ def image(name_orig, args=''):
     # If the image we have is not in a supported format, convert it.
     name_tgt = ext(name_orig, target_fmt)
     if fmt not in supported_fmts:
-        if x := recall(name_tgt, name_orig):
+        if not recall(name_tgt, name_orig):
             if fmt == '.svg' and target_fmt == 'pdf':
-                shell("inkscape %s --export-pdf=%s" % (name_orig, name_tgt), provides=x)
+                shell("inkscape %s --export-pdf=%s" % (name_orig, name_tgt))
             elif name_orig != name_tgt:
-                shell("convert %s %s" % (name_orig, name_tgt), provides=x)
+                shell("convert %s %s" % (name_orig, name_tgt))
 
     # Insert the image into the document.
     push("\\includegraphics[%s]{%s}" % (args, name_tgt))
