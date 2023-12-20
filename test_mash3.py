@@ -94,7 +94,7 @@ def start_in_temp_directory():
     (symbolic links to) the standard library, and nothing else."""
 
     test_script_dir = os.path.dirname(os.path.abspath(__file__))
-    linked_files = ['mashlib3.mash', 'latex3.mash']
+    linked_files = ['mashlib.mash', 'latex.mash']
     linked_files = map(lambda x: os.path.join(test_script_dir, x), linked_files)
 
     with temporary_current_directory(linked_files=linked_files):
@@ -244,7 +244,7 @@ def test_stdin_input():
     engage(['mash3'])
 
 def test_frame_stats():
-    root = tree_from_string('[[[ include mashlib3.mash ]]] a\nb[[[print()|||d]]]e\nf', 'dummy.mash')
+    root = tree_from_string('[[[ include mashlib.mash ]]] a\nb[[[print()|||d]]]e\nf', 'dummy.mash')
     print(root.as_indented_string())
     _, stats = run_tree(root)
     print(stats)
@@ -389,7 +389,7 @@ def test_mashlib_shell1():
     # Shell commands run correctly.
     code = r"""
         [[[
-            [[[ include mashlib3.mash ]]]
+            [[[ include mashlib.mash ]]]
             x = shell('ls /dev')
             assert isinstance(x, subprocess.CompletedProcess)
         ]]]
@@ -400,7 +400,7 @@ def test_mashlib_shell2():
     # Broken commands raise exceptions.
     code = r"""
         [[[
-            [[[ include mashlib3.mash ]]]
+            [[[ include mashlib.mash ]]]
             shell('ls foobar')
         ]]]
     """
@@ -412,7 +412,7 @@ def test_mashlib_shell3():
     # Those exceptions are caught and handled gracefully.
     code = r"""
         [[[
-            [[[ include mashlib3.mash ]]]
+            [[[ include mashlib.mash ]]]
             shell('ls foobar')
         ]]]
     """
@@ -422,7 +422,7 @@ def test_mashlib_shell5():
     # ExceptionGroups are caught and reported gracefully.
     code = r"""
         [[[
-            [[[ include mashlib3.mash ]]]
+            [[[ include mashlib.mash ]]]
             result = shell('ls foobar')
             result = shell('ls baz')
         ]]]
@@ -433,7 +433,7 @@ def test_mashlib_shell6():
     # Missing executables are noticed.
     code = r"""
         [[[
-            [[[ include mashlib3.mash ]]]
+            [[[ include mashlib.mash ]]]
             shell('foobar')
         ]]]
     """
@@ -458,7 +458,7 @@ def test_at_end():
 
 def test_build_dir_created():
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[ shell('touch hello') ]]] 
         [[[ shell('mkdir world') ]]] 
     """
@@ -482,7 +482,7 @@ def test_build_dir_created():
 def test_save1():
     # File is created.
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[
             self.content = self.content.strip()
             save('hello.txt')
@@ -500,7 +500,7 @@ def test_save1():
 def test_save2():
     # Binary mode and explicitly specified contents.
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[
             save('hello.png', contents=b'abcdefg\x45')
         ]]]
@@ -512,7 +512,7 @@ def test_save2():
 def test_save3():
     # Same file errors are caught and ignored.
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[
             self.content = self.content.strip()
             os.mkdir(archive_directory)
@@ -527,7 +527,7 @@ def test_save3():
 def test_recall1():
     # Recalled files that exist are copied in.
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[
             os.mkdir(archive_directory)
             os.system(f'touch {archive_directory}/test.txt')
@@ -539,7 +539,7 @@ def test_recall1():
 def test_recall2():
     # Recalled files that do not exist are not copied in.
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[
             recall('test.txt')
         ]]]
@@ -550,7 +550,7 @@ def test_recall2():
 def test_recall3():
     # Missing dependencies are noticed and complained about.
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[
             os.mkdir(archive_directory)
             os.system(f'touch {archive_directory}/test.txt')
@@ -563,7 +563,7 @@ def test_recall3():
 def test_recall4():
     # Target older than dependencies.
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[
             os.mkdir(archive_directory)
             os.system(f'touch -d 1960-10-13 {archive_directory}/test.txt')
@@ -576,7 +576,7 @@ def test_recall4():
 def test_recall5():
     # Target newer than dependencies.
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[
             os.mkdir(archive_directory)
             os.system(f'touch -d 1960-10-14 {archive_directory}/test.txt')
@@ -589,7 +589,7 @@ def test_recall5():
 def test_recall6():
     # Target is a directory.
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[
             os.mkdir(archive_directory)
             os.mkdir(archive_directory + '/test')
@@ -603,7 +603,7 @@ def test_recall6():
 def test_recall7():
     # Target is a directory that already exists.
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[
             os.mkdir(archive_directory)
             os.mkdir(archive_directory + '/test')
@@ -618,7 +618,7 @@ def test_recall7():
 def test_push():
     # Pushing frame contents.
     code = """
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[
             assert 'abc' in self.content
         |||
@@ -631,7 +631,7 @@ def test_push():
 def test_keep1():
     # Keeping a file.
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[
             os.system('touch 1.txt')
             keep('1.txt')
@@ -643,7 +643,7 @@ def test_keep1():
 def test_keep2():
     # Error from relative path for keep_directory.
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[
             keep_directory = 'keep'
             os.system('touch 1.txt')
@@ -656,7 +656,7 @@ def test_keep2():
 def test_keep3():
     # Create keep directory if needed.
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[
             keep_directory = os.path.join(original_directory, 'keep')
             os.system('touch 1.txt')
@@ -670,7 +670,7 @@ def test_keep4():
     # Keep a directory, replacing an existing version if needed.
     os.mkdir('stuff')
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[
             os.mkdir('stuff')
             os.system('touch stuff/1.txt')
@@ -684,7 +684,7 @@ def test_keep4():
 def test_keep5():
     # Try and fail to keep something that does not exist.
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[
             keep('stuff')
         ]]]
@@ -696,7 +696,7 @@ def test_keep6():
     # If we somehow manage to get something that's neither file nor directory,
     # fail.
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[
             keep('/dev/null')
         ]]]
@@ -706,7 +706,7 @@ def test_keep6():
 
 def test_read():
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[
             save('hello.txt')
         |||
@@ -727,7 +727,7 @@ def test_imprt1():
     # Imported files are actually imported to the build directory.
     os.system('echo hello > hello.txt')
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[ imprt('hello.txt') ]]]
     """
     engage_string(code)
@@ -736,7 +736,7 @@ def test_imprt1():
 def test_imprt2():
     # Fail if we try to rename-on-import more than one file.
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[ imprt('1', '2', target='3') ]]]
     """
     with pytest.raises(ValueError):
@@ -745,7 +745,7 @@ def test_imprt2():
 def test_imprt3():
     # Importing something that doesn't exist might fail or might be ignored.
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[ imprt('1', conditional=%s) ]]]
     """
     engage_string(code % 'True') # pylint:disable=consider-using-f-string
@@ -757,7 +757,7 @@ def test_imprt4():
     # Rename-on-import happens correctly.
     os.system('echo hello > 1')
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[ imprt('1', target='2') ]]]
     """
     engage_string(code)
@@ -767,7 +767,7 @@ def test_imprt4():
 def test_imprt5():
     # Return None if there's nothing to import.
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[ 
             x = imprt()
             assert x is None
@@ -778,7 +778,7 @@ def test_imprt5():
 def test_anonymous_name():
     # Different content gets a different anonymous name.
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[ 
             x = anonymous_name()
         |||
@@ -808,7 +808,7 @@ def test_anonymous_name():
 def test_shell_filter():
     # Shell filter runs the command and grabs the result.
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[
             shell_filter('rev')
             print(self.content)
@@ -821,7 +821,7 @@ def test_shell_filter():
 
 def test_mashlib_root_node():
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[ 
             [[[
             ]]]
@@ -837,7 +837,7 @@ def test_mashlib_root_node():
 
 def test_mashlib_root_name():
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[ 
             [[[
                 assert root_name() == 'dummy'
@@ -852,7 +852,7 @@ def test_before_code_hook():
     os.system('touch 2')
 
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[
             x = '@@1'
             assert '@' not in x, x
@@ -867,7 +867,7 @@ def test_before_code_hook():
 
 def test_after_code_hook():
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[
             def after_code_hook(leaf):
                 global x
@@ -893,7 +893,7 @@ def test_backdoor_comment():
 def test_spell_check1():
     """Spell check with no changes."""
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[ spell_check(command='echo') ]]]
     """
     engage_string(code)
@@ -901,14 +901,14 @@ def test_spell_check1():
 def test_spell_check2():
     """Spell check that changes a file."""
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[ spell_check(command=f'echo xxx > {original_directory}/dummy.mash; echo') ]]]
     """
     engage_string(code)
 
 def test_ext():
     code = r"""
-        [[[ include mashlib3.mash ]]]
+        [[[ include mashlib.mash ]]]
         [[[ 
             assert ext('paper.tex', 'pdf') == 'paper.pdf'
         ]]]
@@ -919,7 +919,7 @@ def test_ext():
 def test_latex1():
     # Complain if a compiler is specified.
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[ latex(name='paper', compiler='latex') ]]]
     """
     with pytest.raises(ValueError):
@@ -928,7 +928,7 @@ def test_latex1():
 def test_latex2():
     # LaTeX documents with various features compile.
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[ save('main.bib') |||
             @article{xyz,
                 author = {A},
@@ -956,10 +956,10 @@ def test_latex2():
     engage_string(code)
     assert os.path.isfile('paper.pdf')
 
-def test_latex3():
+def test_latex():
     # LaTeX errors are complained about.
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[ latex(name='paper') |||
             \notactuallylatexcode 
         ]]]
@@ -971,7 +971,7 @@ def test_latex3():
 def test_latex4():
     # LaTeX callbacks are called.
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[
             called = False
             def cb():
@@ -993,7 +993,7 @@ def test_latex4():
 def test_latex5():
     # LaTeX document with an index is compiled correctly.
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[ latex(name='paper') |||
             \documentclass{article}
             \usepackage{makeidx}
@@ -1013,7 +1013,7 @@ def test_latex5():
 def test_latex6():
     # LaTeX respects max_compiles argument.
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[ latex(name='paper', max_compiles=1) |||
             \documentclass{article}
             \begin{document}
@@ -1026,7 +1026,7 @@ def test_latex6():
 def test_latex7():
     # LaTeX via dvi gives a PDF.
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[ latex_mode = 'latex' ]]]
         [[[ latex(name='paper') |||
             \documentclass{article}
@@ -1042,7 +1042,7 @@ def test_latex7():
 def test_latex8():
     # Strict checking finds reference problems.
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[ latex(name='paper', strict=True) |||
             \documentclass{article}
             \begin{document}
@@ -1057,7 +1057,7 @@ def test_latex8():
 def test_latex9():
     # Strict checking with no problems does not complain.
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[ latex(name='paper', strict=True) |||
             \documentclass{article}
             \begin{document}
@@ -1071,7 +1071,7 @@ def test_latex9():
 def test_dot1():
     # Complain about dot on an empty frame.
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[ dot() ]]]
     """
     with pytest.raises(ValueError):
@@ -1081,7 +1081,7 @@ def test_dot1():
 def test_dot2():
     # Compile dot with latex_mode="latex".
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[ latex_mode = 'latex' ]]]
         [[[ latex(name='paper') |||
             \documentclass{article}
@@ -1100,7 +1100,7 @@ def test_dot2():
 def test_dot3():
     # Compile dot via xfig.
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[ latex(name='paper') |||
             \documentclass{article}
             \usepackage{graphicx}
@@ -1119,7 +1119,7 @@ def test_dot3():
 def test_xfig1():
     # Complain about both including and excluding depths.
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[
             xfig('irrelevant.fig', include_depths=[1,2,3], exclude_depths=[4,5,6])
         ]]]
@@ -1130,7 +1130,7 @@ def test_xfig1():
 def test_xfig2():
     # Locate dependendies in xfig.
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[ unindent(); self.content=self.content.strip(); save('picture.fig') |||
             #FIG 3.2  Produced by xfig version 3.2.5b
             Landscape
@@ -1156,7 +1156,7 @@ def test_xfig3():
     # No complaints from xfig with include or exclude lists
     # nor with latex_mode='latex'
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[ unindent(); self.content=self.content.strip(); save('box.fig') |||
             #FIG 3.2  Produced by xfig version 3.2.5b
             Landscape
@@ -1182,7 +1182,7 @@ def test_xfig3():
 def test_xfig4():
     # Complain about includegraphics args in direct mode.
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[ unindent(); self.content=self.content.strip(); save('box.fig') |||
             #FIG 3.2  Produced by xfig version 3.2.5b
             Landscape
@@ -1206,7 +1206,7 @@ def test_xfig4():
 def test_xfig5():
     # No complaints from xfig in indirect mode.
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[ unindent(); self.content=self.content.strip(); save('box.fig') |||
             #FIG 3.2  Produced by xfig version 3.2.5b
             Landscape
@@ -1229,7 +1229,7 @@ def test_xfig5():
 def test_asy1():
     # Complain about calling asy() with no input.
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[ asy() ]]]
     """
     with pytest.raises(ValueError):
@@ -1238,7 +1238,7 @@ def test_asy1():
 def test_asy2():
     # No complaints from normal asy().
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[ save('test.asy') |||
             draw((3,5)--(7,5));
         ]]]
@@ -1249,7 +1249,7 @@ def test_asy2():
 def test_asy3():
     # Complain about asy() with inconsistent inputs.
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[ asy('test.asy') |||
             draw((3,5)--(7,5));
         ]]]
@@ -1260,7 +1260,7 @@ def test_asy3():
 def test_asy4():
     # No complaints from asy() with latex_mode == 'latex'.
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[ latex_mode = 'latex' ]]]
         [[[ asy() |||
             draw((3,5)--(7,5));
@@ -1271,7 +1271,7 @@ def test_asy4():
 def test_asy5():
     # Find asymptote imports correctly.
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[ latex_mode = 'latex' ]]]
         [[[ asy() |||
             import graph;
@@ -1283,7 +1283,7 @@ def test_asy5():
 def test_image1():
     # Insert an image normally, with no conversion.
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[ image('irrelevant.pdf') ]]]
     """
     engage_string(code)
@@ -1291,7 +1291,7 @@ def test_image1():
 def test_image2():
     # Insert an image with latex_mode='latex' and normal conversion.
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[ latex_mode = 'latex' ]]]
         [[[ save('box.svg') |||
             <?xml version="1.0" encoding="UTF-8" standalone="no"?>
@@ -1309,7 +1309,7 @@ def test_image3():
     # Insert an image with conversion from SVG to PDF.  (This pair is a special
     # case that goes via inkscape.)
     code = r"""
-        [[[ include latex3.mash ]]]
+        [[[ include latex.mash ]]]
         [[[ save('box.svg') |||
             <?xml version="1.0" encoding="UTF-8" standalone="no"?>
             <svg width="210mm" height="297mm">
