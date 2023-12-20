@@ -361,7 +361,8 @@ def test_restart_request2():
     assert os.path.exists('2')
 
 def test_include():
-    # Included files are found and imported.
+    # Included files are found and imported if they exist, or complained about
+    # if they don't.
     included = """
         [[[
             def foo():
@@ -375,6 +376,10 @@ def test_include():
             foo()
         ]]]
     """
+
+    with pytest.raises(FileNotFoundError):
+        engage_string(code)
+
     with open('included-dummy.mash', 'w', encoding='utf-8') as output:
         print(included, file=output)
 
@@ -810,6 +815,33 @@ def test_shell_filter():
             assert 'olleh' in self.content
         |||
             hello world
+        ]]]
+    """
+    engage_string(code)
+
+def test_mashlib_root_node():
+    code = r"""
+        [[[ include mashlib3.mash ]]]
+        [[[ 
+            [[[
+            ]]]
+            [[[
+                root = root_node()
+                assert root.parent is None
+                assert root is not self
+            ]]]
+        ]]]
+    """
+    engage_string(code)
+
+
+def test_mashlib_root_name():
+    code = r"""
+        [[[ include mashlib3.mash ]]]
+        [[[ 
+            [[[
+                assert root_name() == 'dummy'
+            ]]]
         ]]]
     """
     engage_string(code)
@@ -1289,6 +1321,7 @@ def test_image3():
         [[[ image('box.svg') ]]]
     """
     engage_string(code)
+
 
 
 if __name__ == '__main__':  #pragma: nocover

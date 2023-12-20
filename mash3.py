@@ -42,7 +42,6 @@ import sys
 import time
 
 from abc import ABC, abstractmethod
-from exceptiongroup import ExceptionGroup
 
 original_cwd = None
 
@@ -297,7 +296,8 @@ class IncludeLeaf(FrameTreeLeaf):
         if not ok:
             self.address.exception(f"Trying to include {self.content},"
                                    + "but could not find it in any of these places:\n"
-                                   + '\n'.join(look_in))
+                                   + '\n'.join(look_in),
+                                   type_=FileNotFoundError)
 
         with open(x, 'r', encoding='utf-8') as input_file:
             text = input_file.read()
@@ -526,13 +526,6 @@ def run_from_args(argv):
     except subprocess.CalledProcessError as e:
         report_exception(e)
         return e.returncode
-    except ExceptionGroup as eg:
-        print(80*'-')
-        for e in eg.exceptions:
-            report_exception(e)
-            print(80*'-')
-        print(f'{len(eg.exceptions)} total errors')
-        return 255
 
 
     end_time = time.time()
