@@ -65,6 +65,7 @@ def full_check():
     for mash, py in hack_map.items():
         sed_pat = re.sub(r'/', r'\/', py)
         command += rf'| sed -e s"/{sed_pat}/{mash}/"'
+    print('Running pylint...')
     os.system(command)
 
     # - pytest with coverage tracing

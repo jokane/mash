@@ -22,7 +22,9 @@ import resource
 import shutil
 import subprocess
 import sys
+import packaging.version
 
+MASHLIB_VERSION='3.0'
 
 # First, some initialization.  This should only happen once.
 try:
@@ -37,6 +39,9 @@ if not mashlib_initialized:
     # executed.  Dummy values here help to appease pylint.
     self = None
     leaf = None
+
+    # Note which version of this library we are using.
+    versions['mashlib'] = MASHLIB_VERSION
 
     # A list of executable names whose existence we have already verified.
     executables_checked = set()
@@ -80,6 +85,25 @@ if not mashlib_initialized:
     if not os.path.exists(build_directory):
         os.makedirs(build_directory)
     os.chdir(build_directory)
+
+def require_versions(**kwargs):
+    """Ensure that each of the given items is available in a version at or
+    newer than the given version."""
+    for item, needed_version_string in kwargs.items():
+        needed_version = packaging.version.parse(needed_version_string)
+
+        try:
+            actual_version_string = versions[item]
+        except KeyError as e:
+            raise ValueError(f"We need version {needed_version} of {item},"
+                             "but don't have any version of that.") from e
+        actual_version = packaging.version.parse(actual_version_string)
+
+        if needed_version > actual_version:
+            raise ValueError(f'For {item}, we need version {needed_version}'
+                             'but have only {actual_version}.')
+
+
 
 def check_for_executable(exe):
     """Check whether some executable with the given name exists in the path.

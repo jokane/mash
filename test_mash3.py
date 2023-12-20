@@ -385,6 +385,48 @@ def test_include():
 
     engage_string(code)
 
+def test_mashlib_require_versions1():
+    # Mash version is passed in correctly.
+    code = r"""
+        [[[
+            [[[ include mashlib.mash ]]]
+            require_versions(mash='2.0')
+        ]]]
+    """
+    engage_string(code)
+
+def test_mashlib_require_versions2():
+    # Complain about versions that are too old.
+    code = r"""
+        [[[
+            [[[ include mashlib.mash ]]]
+            require_versions(mash='2.0', mashlib='3.1')
+        ]]]
+    """
+    with pytest.raises(ValueError):
+        engage_string(code)
+
+def test_mashlib_require_versions3():
+    # Don't complain about versions that are not too old.
+    code = r"""
+        [[[
+            [[[ include mashlib.mash ]]]
+            require_versions(mash='2.0', mashlib='3.0')
+        ]]]
+    """
+    engage_string(code)
+
+def test_mashlib_require_versions4():
+    # Complain when the thing is missing entirely.
+    code = r"""
+        [[[
+            [[[ include mashlib.mash ]]]
+            require_versions(foo='3.0')
+        ]]]
+    """
+    with pytest.raises(ValueError):
+        engage_string(code)
+
 def test_mashlib_shell1():
     # Shell commands run correctly.
     code = r"""

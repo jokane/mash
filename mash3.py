@@ -43,6 +43,8 @@ import time
 
 from abc import ABC, abstractmethod
 
+MASH_VERSION='3.0'
+
 original_cwd = None
 
 class RestartRequest (Exception):
@@ -144,7 +146,8 @@ def default_variables():
     variables dict has been established yet."""
     return {
         'RestartRequest': RestartRequest,
-        'TextLeaf': TextLeaf
+        'TextLeaf': TextLeaf,
+        'versions': { 'mash': MASH_VERSION }
     }
 
 class Frame(FrameTreeNode):
