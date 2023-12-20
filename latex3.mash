@@ -102,7 +102,7 @@ def latex(name, compiler=None, ignore_deps=None, keep_pdf=True, callback=None,
                     bibtex_done = True
 
             if not makeindex_done and os.path.isfile(name+".idx"):
-                shell("makeindex %s.idx" % name).result()
+                shell("makeindex %s.idx" % name)
                 makeindex_done = True
 
             if max_compiles and compiles >= max_compiles:
@@ -114,7 +114,7 @@ def latex(name, compiler=None, ignore_deps=None, keep_pdf=True, callback=None,
             last_log = log
 
         if latex_mode == 'latex':
-            shell(f'dvipdf {name}.dvi').result()
+            shell(f'dvipdf {name}.dvi')
 
         # If we are doing strict checking, dig through the final log, looking
         # for problems.
@@ -251,7 +251,8 @@ def xfig(fname_fig, args='', direct=True, include_depths=None, exclude_depths=No
         if not recall(fname_fmt, fname_fig, *deps):
             shell("fig2dev -L %stex %s -O %s > %s" % (shfmt, fig2dev_args, fname_fig, fname_fmt))
         if not recall(fname_tex, fname_fig, *deps):
-            shell("fig2dev -L %stex_t %s -p %s %s > %s" % (shfmt, fig2dev_args, fname_fmt, fname_fig, fname_tex))
+            shell("fig2dev -L %stex_t %s -p %s %s > %s"
+                  % (shfmt, fig2dev_args, fname_fmt, fname_fig, fname_tex))
         push(r"\input{%s}" % (fname_tex, ))
     else:
         # Convert directly to an external format that can be inserted with

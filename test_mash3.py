@@ -18,7 +18,6 @@ import traceback
 import os
 
 import pytest
-from exceptiongroup import ExceptionGroup
 
 from mash3 import *
 
@@ -387,7 +386,7 @@ def test_mashlib_shell1():
         [[[
             [[[ include mashlib3.mash ]]]
             x = shell('ls /dev')
-            assert isinstance(x, concurrent.futures.Future)
+            assert isinstance(x, subprocess.CompletedProcess)
         ]]]
     """
     engage_string(code)
@@ -414,19 +413,6 @@ def test_mashlib_shell3():
     """
     engage_string(code)
 
-def test_mashlib_shell4():
-    # Multiple broken commands raise an ExecptionGroup.
-    code = r"""
-        [[[
-            [[[ include mashlib3.mash ]]]
-            result = shell('ls foobar')
-            result = shell('ls baz')
-        ]]]
-    """
-    root = tree_from_string(code, 'dummy.mash')
-    with pytest.raises(ExceptionGroup):
-        run_tree(root)
-
 def test_mashlib_shell5():
     # ExceptionGroups are caught and reported gracefully.
     code = r"""
@@ -449,64 +435,9 @@ def test_mashlib_shell6():
     with pytest.raises(ValueError):
         engage_string(code)
 
-def test_mashlib_shell_wait():
-    # Using a string for provides is handled as a single thing, instead of
-    # iterating over characters.  Calling wait_for allows the process to
-    # complete.
-    code = r"""
-        [[[
-            [[[ include mashlib3.mash ]]]
-            import os
-            shell('sleep 1; ls > files.txt', provides='files.txt')
-            assert not os.path.isfile('files.txt')
-            wait_for('files.txt')
-            assert os.path.isfile('files.txt')
-        ]]]
-    """
-    variables = {}
-    root = tree_from_string(code, 'dummy.mash')
-    root.execute(variables)
-    assert list(variables['resource_futures']) == [ 'files.txt' ]
-
-def test_mashlib_wait_for1():
-    # Waiting for a non-existent resource causes an exception.
-    code = r"""
-        [[[ include mashlib3.mash ]]]
-        [[[ wait_for('broken') ]]]
-    """
-    with pytest.raises(ValueError):
-        engage_string(code)
 
 
 
-def test_subprocess_max_jobs():
-    # The max_jobs setting actually limits the number of parallel shell jobs
-    # running at a time.
-    code = r"""
-        [[[
-            [[[ include mashlib3.mash ]]]
-            max_jobs = 2
-            shell('echo 10 >> nums; sleep 0.1; echo 11 >> nums; sleep 0.1')
-            shell('echo 20 >> nums; sleep 0.1; echo 21 >> nums; sleep 0.1')
-            shell('echo 30 >> nums; sleep 0.1; echo 31 >> nums; sleep 0.1')
-        ]]]
-    """
-    engage_string(code)
-
-    with open('.mash/nums', encoding='utf-8') as numbers_file:
-        numbers = numbers_file.read()
-
-    numbers = list(map(int, numbers.strip().split('\n')))
-    print(numbers)
-
-    # 20 before 11, to show that the second job runs in parallel with the
-    # first one.
-    assert numbers.index(20) < numbers.index(11)
-
-    # (30 after 11) or (30 after 21), to show that the third job waits
-    # until either of the first two are done.
-    assert (numbers.index(30) > numbers.index(11)) or \
-        (numbers.index(30) > numbers.index(21))
 
 def test_at_end():
     # Call to at_end() after full tree is executed.
@@ -595,7 +526,7 @@ def test_recall1():
         [[[
             os.mkdir(archive_directory)
             os.system(f'touch {archive_directory}/test.txt')
-            assert recall('test.txt') is None
+            assert recall('test.txt')
         ]]]
     """
     engage_string(code)
@@ -605,10 +536,11 @@ def test_recall2():
     code = r"""
         [[[ include mashlib3.mash ]]]
         [[[
-            assert recall('test.txt') == 'test.txt'
+            recall('test.txt')
         ]]]
     """
     engage_string(code)
+    assert not os.path.exists('test.txt')
 
 def test_recall3():
     # Missing dependencies are noticed and complained about.
@@ -631,7 +563,7 @@ def test_recall4():
             os.mkdir(archive_directory)
             os.system(f'touch -d 1960-10-13 {archive_directory}/test.txt')
             os.system(f'touch -d 1960-10-14 dep.txt')
-            assert recall('test.txt', 'dep.txt') == 'test.txt'
+            assert not recall('test.txt', 'dep.txt')
         ]]]
     """
     engage_string(code)
@@ -644,7 +576,7 @@ def test_recall5():
             os.mkdir(archive_directory)
             os.system(f'touch -d 1960-10-14 {archive_directory}/test.txt')
             os.system(f'touch -d 1960-10-13 dep.txt')
-            assert recall('test.txt', 'dep.txt') is None
+            assert recall('test.txt', 'dep.txt')
         ]]]
     """
     engage_string(code)
@@ -657,8 +589,8 @@ def test_recall6():
             os.mkdir(archive_directory)
             os.mkdir(archive_directory + '/test')
             os.system(f'touch -d 1960-10-13 {archive_directory}/test')
-            os.system(f'touch -d 1960-10-13 dep.txt')
-            assert recall('test') is None
+            os.system(f'touch -d 1960-10-14 dep.txt')
+            assert recall('test')
         ]]]
     """
     engage_string(code)
@@ -673,24 +605,7 @@ def test_recall7():
             os.mkdir('test')
             os.system(f'touch -d 1960-10-13 {archive_directory}/test')
             os.system(f'touch -d 1960-10-13 dep.txt')
-            assert recall('test') is None
-        ]]]
-    """
-    engage_string(code)
-
-def test_recall8():
-    # In-progress dependencies are waited for.
-    code = r"""
-        [[[ include mashlib3.mash ]]]
-        [[[
-            shell('sleep 0.3; echo hello > 1.txt', provides='1.txt')
-            shell('sleep 0.1; echo world > 2.txt', provides='2.txt')
-
-            if x := recall('3.txt', '1.txt', '2.txt'):
-                shell('cat 1.txt 2.txt > 3.txt', provides=x)
-
-            wait_for('3.txt')
-            os.system('cat 3.txt')
+            assert recall('test')
         ]]]
     """
     engage_string(code)

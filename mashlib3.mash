@@ -13,7 +13,6 @@ start."""
 # pylint: disable=duplicate-code
 
 
-import concurrent.futures
 import filecmp
 import glob
 import hashlib
@@ -23,9 +22,6 @@ import resource
 import shutil
 import subprocess
 import sys
-
-
-from exceptiongroup import ExceptionGroup
 
 
 # First, some initialization.  This should only happen once.
@@ -47,19 +43,6 @@ if not mashlib_initialized:
 
     # A limit on the number of parallel jobs to run at a time.
     max_jobs = os.cpu_count() + 4
-
-    # The manager for the thread pool that handles expensive jobs, mostly from
-    # shell().  Created on the first call that needs it, rather than here, to
-    # give the client code time to change max_jobs.
-    job_executor = None
-
-    # A dictionary mapping resource names to futures of the processes that
-    # are working on them.
-    resource_futures = {}
-
-    # A list of *all* of the futures, even the ones with no associated
-    # resources.
-    all_futures = []
 
     # This is the directory where started.
     original_directory = os.getcwd()
@@ -105,39 +88,17 @@ def check_for_executable(exe):
         raise ValueError(f'Executable {exe} not found in path.')
     executables_checked.add(exe)
 
-def job(provides, func, *args):
-    """ Call the given function asyncronously in a shell.  Track which files
-    this command "provides", to potentially wait_for them later."""
-    global job_executor
-
-    if job_executor is None:
-        job_executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_jobs)
-
-    if provides is None:
-        provides = []
-    if isinstance(provides, str):
-        provides = [ provides ]
-
-    future = job_executor.submit(func, *args)
-    print(f"  [{func.__name__}] {args}")
-
-
-    for res in provides:
-        resource_futures[res] = future
-    all_futures.append(future)
-
 
 def shell(command, stdin=None, check=True):
-    """Execute the given command asyncronously in a shell.  Raise
+    """Execute the given command in a shell.  Raise
     subprocess.CalledProcessError if the command gives a non-zero return code.
-    Return a future, which when completed results in CompletedProcess object,
-    which has stdout and stderr attributes.  In addition, this object has
-    attributes tacked on to it showing the user time and system time consumed,
-    as reported by getrusage."""
+    Return a CompletedProcess object, which has stdout and stderr attributes.
+    In addition, this object has attributes tacked on to it showing the user time
+    and system time consumed, as reported by getrusage."""
 
     if check:
         check_for_executable(command.split(' ')[0])
-    
+
     print('  ', command)
 
     usage_before = resource.getrusage(resource.RUSAGE_CHILDREN)
@@ -154,16 +115,6 @@ def shell(command, stdin=None, check=True):
     completed_process.user_time = usage_after.ru_utime - usage_before.ru_utime
     completed_process.sys_time = usage_after.ru_stime - usage_before.ru_stime
 
-    return completed_process
-
-def wait_for(res):
-    """Wait for shell process creating the named resource to complete.
-    Return its CompletedProcess.  Or, if an exception occured in the
-    process, raise it."""
-    if res not in resource_futures:
-        raise ValueError(f'Cannot wait for resource {res} because it is not being built.  These are the resources being built:' + '\n'.join(resource_futures.keys()))
-    future = resource_futures[res]
-    completed_process = future.result()
     return completed_process
 
 def save(target, contents=None):
@@ -216,10 +167,6 @@ def recall(target, *sources):
     archive_target = os.path.join(archive_directory, target)
 
     ok = True
-
-    for source in sources:
-        if source in resource_futures:
-            wait_for(source)
 
     if not os.path.exists(archive_target):
         print(f"({target}): [does not exist]", end='')
@@ -300,7 +247,7 @@ def keep(file_to_keep, target=None):
         raise FileNotFoundError(f"Cannot keep {file_to_keep} because it does not exist.")
     else:
         raise NotImplementedError(f"Don't know how to keep {file_to_keep}, "
-                                   "which is neither file nor directory.")
+                                 "which is neither file nor directory.")
 
 def read(fname):
     """Read the given file, appending to the content of the current frame."""
@@ -366,8 +313,7 @@ def anonymous_name(content=None):
 def shell_filter(command):
     """Execute the given command in a shell, giving the contents of this frame
     as standard input.  Replace the contents of this frame with the output."""
-    future = shell(command, stdin=self.content.encode('utf-8'))
-    completed_process = future.result()
+    completed_process = shell(command, stdin=self.content.encode('utf-8'))
     self.content = completed_process.stdout.decode('utf-8')
 
 def before_code_hook():
@@ -395,7 +341,9 @@ def spell_check(command='aspell'):
     for filename in sorted(glob.glob(os.path.join(original_directory, '*.mash'))):
         with open(filename, 'r', encoding='utf-8') as it:
             contents_before = it.read()
-        full_command = f"{command} check --home-dir={original_directory} --keymapping ispell {filename}"
+        full_command = (f"{command} check"
+                        f" --home-dir={original_directory}"
+                        f" --keymapping ispell {filename}")
         os.system(full_command)
         with open(filename, 'r', encoding='utf-8') as it:
             contents_after = it.read()
@@ -435,32 +383,19 @@ def unindent():
 
 
 def root_node():
+    """Return the root node of the frame tree."""
     node = self
     while node.parent is not None:
         node = node.parent
     return node
 
 def root_mash_name():
+    """Return the filename of the root node of the frame tree."""
     return root_node().address.filename
 
 def root_name():
+    """Return the base name of the root filename."""
     return re.sub(".mash", "", root_mash_name())
 
-def at_end():
-    """Executed automatically at the end of the run.  Finishes outstanding
-    jobs and raises and exceptions that we've been saving up."""
-    # Finish up any jobs that are still running.
-    exceptions = []
-    for future in all_futures:
-        try:
-            future.result()
-        except Exception as exception:  #pylint: disable=broad-except
-            exceptions.append(exception)
-
-    # Report any exceptions that occured.
-    if len(exceptions) == 1:
-        raise exceptions[0]
-    if len(exceptions) > 1:
-        raise ExceptionGroup("multiple failed jobs", exceptions)
 
 ]]]

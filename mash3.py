@@ -3,6 +3,7 @@
 # pylint: disable=too-few-public-methods
 # pylint: disable=invalid-name
 # pylint: disable=exec-used
+# pylint: disable=global-statement
 
 """This is a tool that allows text in various languages to be stored together
 in a single input file. along with instructions for manipulating, mutating, and
@@ -42,6 +43,8 @@ import time
 
 from abc import ABC, abstractmethod
 from exceptiongroup import ExceptionGroup
+
+original_cwd = None
 
 class RestartRequest (Exception):
     """ A special exception to be raised when some part of the code wants to
@@ -292,7 +295,9 @@ class IncludeLeaf(FrameTreeLeaf):
                 break
 
         if not ok:
-              self.address.exception("Trying to include %s, but could not find it in any of these places:\n%s" % (self.content, '\n'.join(look_in)))
+            self.address.exception(f"Trying to include {self.content},"
+                                   + "but could not find it in any of these places:\n"
+                                   + '\n'.join(look_in))
 
         with open(x, 'r', encoding='utf-8') as input_file:
             text = input_file.read()
