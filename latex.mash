@@ -32,6 +32,8 @@ def latex(name, compiler=None, ignore_deps=None, keep_pdf=True, callback=None,
           max_compiles=None, strict=False):
     """Compile a frame as a LaTeX document."""
 
+    assert isinstance(name, str)
+
     # Complain in old documents.
     if compiler is not None:
         raise ValueError('Compiler argument to latex() is no longer supported. '
