@@ -52,7 +52,7 @@ def temporary_current_directory(linked_files=None):
                 pass
 
 def run_tests_from_pattern(pattern): #pragma nocover
-    # Execute all tests whose names containing the pattern.
+    # Execute all tests whose names contain the pattern.
     pattern = ''
     try:
         pattern = sys.argv[1]
