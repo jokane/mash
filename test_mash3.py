@@ -230,13 +230,39 @@ def test_frame_node_long_contents():
     print(ais)
     assert len(ais) < 100
 
-def test_all_nodes1():
+def test_all_nodes():
     # all_nodes() traverses the whole tree.
     root = tree_from_string(code_to_parse, 'dummy.mash')
     print(root.as_indented_string())
     for i, node in enumerate(root.all_nodes()):
         print(i, node.as_indented_string())
     assert len(list(root.all_nodes())) == 8, len(list(root.all_nodes()))
+
+def test_get_constraints():
+    # Default constraints are generated.
+    root = tree_from_string(code_to_parse, 'dummy.mash')
+
+    # Top-level frame: No constraints
+    assert len(list(root.get_constraints(root))) == 0
+
+    # Embedded frame: No constraints
+    assert len(list(root.children[0].get_constraints(root))) == 0
+
+    # Code leaf: One constraint, to execute it before its parent
+    code_leaf = root.children[1].children[0]
+    constraints = list(code_leaf.get_constraints(root))
+    assert len(constraints) == 1
+    assert constraints[0] == (code_leaf, code_leaf.parent)
+
+def test_get_all_constraints():
+    # Correctly collect all constraints from the whole tree.
+    root = tree_from_string(code_to_parse, 'dummy.mash')
+    constraints = list(root.get_all_constraints())
+
+    # Two code leaves, each to execute before the frame that contains it.
+    assert len(constraints) == 2
+
+
 
 def test_dash_c():
     # Running with -c removes the archives.

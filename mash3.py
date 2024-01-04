@@ -138,6 +138,22 @@ class FrameTreeNode(ABC):
     def all_nodes(self):
         """Return a generator that yields all of the nodes in this tree."""
 
+    def get_constraints(self, root): #pylint: disable=unused-argument,no-self-use
+        """Return an iterable of (node1, node2) pairs indicating that node1 should
+        be executed before node2.  Generally should be based on the contraints
+        specified or implicitly existing at this node.  Usually either node1 or
+        node2 will be self (i.e. constraints for this node to be executed
+        before or after another node) but that's not strictly necessary)."""
+
+        # By default, there are no constraints.
+        yield from ()
+
+    def get_all_constraints(self):
+        """Return a list of all of the constraints in this tree."""
+        for node in self.all_nodes():
+            yield from node.get_constraints(self)
+
+
     def announce(self, variables):
         """Print some details about this node, to be called just before
         executing."""
@@ -247,6 +263,14 @@ class FrameTreeLeaf(FrameTreeNode):
 
 class CodeLeaf(FrameTreeLeaf):
     """A leaf node representing Python code to be executed."""
+    def get_constraints(self, root):
+        # For now, use a default set of constaints that give the class mash
+        # behavior.
+
+        # Execute each non-root node before its parent.
+        if self.parent is not None:
+            yield (self, self.parent)
+
     def execute(self, variables):
         """ Execute our text as Python code."""
         self.announce(variables)
