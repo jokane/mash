@@ -134,12 +134,16 @@ class FrameTreeNode(ABC):
         """Return a nicely-formatted representation of this node, including
         its descendants, indented two spaces for each level."""
 
+    @abstractmethod
+    def all_nodes(self):
+        """Return a generator that yields all of the nodes in this tree."""
+
     def announce(self, variables):
         """Print some details about this node, to be called just before
         executing."""
-        # print(f"Executing {type(self)} with {len(variables)} variables:")
-        # print(self.as_indented_string(indent_level=1), end='')
-        # print()
+        print(f"Executing {type(self)} with {len(variables)} variables:")
+        print(self.as_indented_string(indent_level=1), end='')
+        print()
 
 def default_variables():
     """Return a dictionary to use as the variables in cases where no
@@ -167,6 +171,11 @@ class Frame(FrameTreeNode):
             r += child.as_indented_string(indent_level+1)
         r += ('  '*indent_level) + ']]]\n'
         return r
+
+    def all_nodes(self):
+        yield self
+        for child in self.children:
+            yield from child.all_nodes()
 
     def execute(self, variables):
         """Do the work for this frame.  Run each of the children, pull their
@@ -232,6 +241,9 @@ class FrameTreeLeaf(FrameTreeNode):
             x = x[:60] + '...'
         return (('  '*indent_level)
           + f'{self.line_marker()} {x} {self.address}\n')
+
+    def all_nodes(self):
+        yield self
 
 class CodeLeaf(FrameTreeLeaf):
     """A leaf node representing Python code to be executed."""

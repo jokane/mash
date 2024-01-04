@@ -230,6 +230,14 @@ def test_frame_node_long_contents():
     print(ais)
     assert len(ais) < 100
 
+def test_all_nodes1():
+    # all_nodes() traverses the whole tree.
+    root = tree_from_string(code_to_parse, 'dummy.mash')
+    print(root.as_indented_string())
+    for i, node in enumerate(root.all_nodes()):
+        print(i, node.as_indented_string())
+    assert len(list(root.all_nodes())) == 8, len(list(root.all_nodes()))
+
 def test_dash_c():
     # Running with -c removes the archives.
     with temporary_current_directory():
