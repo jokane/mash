@@ -134,6 +134,11 @@ class FrameTreeNode(ABC):
     def __str__(self):
         return f'{self.__class__.__name__}:{self.num:03d}'
 
+    @classmethod
+    @abstractmethod
+    def name(cls, plural):
+        """A human-readable name for the type thing represented by this node."""
+
     @abstractmethod
     def start(self, variables):
         """Do the initial wok represented by this node, if any.  Return True if
@@ -180,6 +185,10 @@ class Frame(FrameTreeNode):
         self.children = []
         self.separated = False
         self.content = ''
+
+    @classmethod
+    def name(cls, plural):
+        return 'frames' if plural else 'frame'
 
     def constraints(self, root):
         # Start before we finish.
@@ -241,6 +250,10 @@ class FrameTreeLeaf(FrameTreeNode):
 
 class CodeLeaf(FrameTreeLeaf):
     """A leaf node representing Python code to be executed."""
+    @classmethod
+    def name(cls, plural):
+        return 'code segments' if plural else 'code segment'
+
     def constraints(self, root):
         yield (Start(self), Finish(self))
 
@@ -283,6 +296,10 @@ class CodeLeaf(FrameTreeLeaf):
 
 class TextLeaf(FrameTreeLeaf):
     """A leaf node representing just text."""
+    @classmethod
+    def name(cls, plural):
+        return 'text segments' if plural else 'text segment'
+
     def constraints(self, root):
         yield (Start(self), Finish(self))
 
@@ -305,6 +322,10 @@ class IncludeNode(FrameTreeNode):
         super().__init__(address, parent)
         self.tree = None
         self.content = content
+
+    @classmethod
+    def name(cls, plural):
+        return 'includes' if plural else 'include'
 
     def constraints(self, root):
         if self.tree is not None:
@@ -566,11 +587,12 @@ def run_tree(root, verbose=False):
                 continue
 
             # This event is ready to execute.  Record the statistics.
-            t = type(event)
-            try:
-                stats[t] += 1
-            except KeyError:
-                stats[t] = 1
+            if event.start:
+                t = type(event.node)
+                try:
+                    stats[t] += 1
+                except KeyError:
+                    stats[t] = 1
 
             # Actually execute it.
             executed_events.add(event)
@@ -635,7 +657,8 @@ def run_from_args(argv):
     end_time = time.time()
     elapsed = f'{end_time-start_time:.02f}'
 
-    print(f"{stats}; {elapsed} seconds")
+    stats_text = '; '.join([f'{y} {x.name(y!=1)}' for x,y in stats.items() ])
+    print(f"{stats_text}; {elapsed} seconds")
 
     return stats
 
