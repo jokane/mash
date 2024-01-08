@@ -20,6 +20,7 @@ import os
 import pytest
 
 from mash3 import *
+import mash3
 
 @contextlib.contextmanager
 def temporarily_changed_directory(directory):
@@ -308,6 +309,12 @@ def test_run_tree2():
     root = tree_from_string('[[[ print("B") ||| [[[ print C ||| D ]]] ]]]', 'dummy.mash')
     with pytest.raises(SyntaxError):
         run_tree(root)
+
+def test_run_tree3():
+    # No complaints from verbose run_tree.
+    mash3.original_cwd = os.getcwd()
+    root = tree_from_string('[[[ include mashlib.mash ]]]', 'dummy.mash')
+    run_tree(root, verbose=True)
 
 def test_vars1():
     # Variables from child frames are visible to parents.

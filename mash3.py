@@ -319,6 +319,7 @@ class IncludeNode(FrameTreeNode):
 
         look_in = [ original_cwd ] + sys.path
         for directory in look_in:
+            print(directory, self.content)
             x = os.path.join(directory, self.content)
             if os.path.exists(x):
                 ok = True
@@ -523,10 +524,8 @@ def tree_from_element_seq(seq):
     return frame
 
 
-def run_tree(root):
+def run_tree(root, verbose=False):
     """Execute the given tree."""
-    verbose = False
-
     variables = default_variables()
     stats = {}
     executed_events = set()
