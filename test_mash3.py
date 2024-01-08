@@ -83,11 +83,18 @@ def engage_string(code):
         print(code, file=output_file)
 
     with temporarily_changed_directory('.'):
-        engage(['mash3', filename])
+        stats = engage(['mash3', filename])
+
+    return stats
 
 @pytest.fixture(autouse=True)
 def fixture_start_in_temp_directory():
     yield from start_in_temp_directory()
+
+@pytest.fixture(autouse=True)
+def fixture_reset_node_number():
+    FrameTreeNode.next_node_num = 0
+    yield
 
 def start_in_temp_directory():
     """All tests run with a "clean" temporary current directory, containing
@@ -228,7 +235,7 @@ def test_frame_node_long_contents():
     node = TextLeaf(Address('dummy.mash', 1, 1), None, 1000*'-')
     ais = node.as_indented_string()
     print(ais)
-    assert len(ais) < 100
+    assert len(ais) < 500
 
 def test_all_nodes():
     # all_nodes() traverses the whole tree.
@@ -238,29 +245,11 @@ def test_all_nodes():
         print(i, node.as_indented_string())
     assert len(list(root.all_nodes())) == 8, len(list(root.all_nodes()))
 
-def test_get_constraints():
-    # Default constraints are generated.
-    root = tree_from_string(code_to_parse, 'dummy.mash')
-
-    # Top-level frame: No constraints
-    assert len(list(root.get_constraints(root))) == 0
-
-    # Embedded frame: No constraints
-    assert len(list(root.children[0].get_constraints(root))) == 0
-
-    # Code leaf: One constraint, to execute it before its parent
-    code_leaf = root.children[1].children[0]
-    constraints = list(code_leaf.get_constraints(root))
-    assert len(constraints) == 1
-    assert constraints[0] == (code_leaf, code_leaf.parent)
-
-def test_get_all_constraints():
+def test_all_constraints():
     # Correctly collect all constraints from the whole tree.
     root = tree_from_string(code_to_parse, 'dummy.mash')
-    constraints = list(root.get_all_constraints())
-
-    # Two code leaves, each to execute before the frame that contains it.
-    assert len(constraints) == 2
+    constraints = list(root.all_constraints())
+    assert len(constraints) == 26
 
 
 
@@ -277,64 +266,48 @@ def test_stdin_input():
     # Nothing explodes when we give (empty) stdin as the input.
     engage(['mash3'])
 
-def test_frame_stats():
-    root = tree_from_string('[[[ include mashlib.mash ]]] a\nb[[[print()|||d]]]e\nf', 'dummy.mash')
-    print(root.as_indented_string())
-    _, stats = run_tree(root)
-    print(stats)
-
-    # 5 frames:
-    # - top level of main document
-    # - frame with include directive
-    # - top frame of mashlib
-    # - big frame spanning most of mashlib
-    # - short one in the main document
-    assert stats == Stats(5, 2, 1)
 
 def test_codeleaf_execute1():
     # Simple code executes.
-    CodeLeaf(Address('dummy.mash', 1, 1), None, "print('hello')").execute({})
+    node = CodeLeaf(Address('dummy.mash', 1, 1), None, "print('hello')")
+    node.start({})
+    node.finish({})
 
 def test_codeleaf_execute2():
     # Broken code raises a syntax error.
     with pytest.raises(SyntaxError):
-        CodeLeaf(Address('dummy.mash', 1, 1), None, "print 'hello'").execute({})
+        node = CodeLeaf(Address('dummy.mash', 1, 1), None, "print 'hello'")
+        node.start({})
 
 def test_codeleaf_execute3():
     # Correct line number.
     with pytest.raises(Exception) as exc_info:
         CodeLeaf(Address('dummy.mash', 5, 1),
                  None,
-                 "  \n\n\n  raise ValueError('sadness')").execute({})
+                 "  \n\n\n  raise ValueError('sadness')").start({})
 
     formatted_tb = '\n'.join(traceback.format_tb(exc_info._excinfo[2]))
     print(formatted_tb)
     assert '"dummy.mash", line 8' in formatted_tb
 
-def test_textleaf_execute1():
-    # Simple.
-    TextLeaf(Address('dummy.mash', 1, 1), None, "print('hello')").execute({})
+def test_textleaf_start1():
+    # Text leaves execute without complaining.
+    TextLeaf(Address('dummy.mash', 1, 1), None, "print('hello')").start({})
 
-def test_textleaf_execute2():
+def test_textleaf_start2():
     # Text leaves don't execute their content as code -- no exception here.
-    TextLeaf(Address('dummy.mash', 1, 1), None, "print 'hello'").execute({})
+    TextLeaf(Address('dummy.mash', 1, 1), None, "print 'hello'").start({})
 
-def test_frame_execute():
-    # Something simple.
-    root = tree_from_string('A [[[ print("B") ]]] C', 'dummy.mash')
-    root.execute({})
-
-def test_frame_execute2():
-    # Check recursive execution, normal case.
+def test_run_tree1():
+    # Code nested frames is executed without a problem.
     root = tree_from_string('[[[ print("B") ||| [[[ print("C") ||| D ]]] ]]]', 'dummy.mash')
-    root.execute({})
+    run_tree(root)
 
-
-def test_frame_execute3():
-    # Check recursive execution, failing.
+def test_run_tree2():
+    # Bad Python raises a syntax error.
     root = tree_from_string('[[[ print("B") ||| [[[ print C ||| D ]]] ]]]', 'dummy.mash')
     with pytest.raises(SyntaxError):
-        root.execute({})
+        run_tree(root)
 
 def test_vars1():
     # Variables from child frames are visible to parents.
@@ -351,21 +324,17 @@ def test_vars2():
     code = r"""
         [[[
             [[[
-                import time
-                time.sleep(0.5)
                 x = 3
             ]]]
             [[[
                 x = 4
             ]]]
+            [[[
+                assert x == 4
+            ]]]
         ]]]
     """
-    variables = {}
-    root = tree_from_string(code, 'dummy.mash')
-    root.execute(variables)
-
-    assert 'x' in variables
-    assert variables['x'] == 4
+    engage_string(code)
 
 def test_restart_request1():
     # RestartRequest is visible from mash code.
@@ -376,12 +345,16 @@ def test_restart_request1():
     """
     root = tree_from_string(code, '')
     with pytest.raises(RestartRequest):
-        root.execute(default_variables())
+        run_tree(root)
 
 def test_restart_request2():
     # RestartRequests are correctly handled.
     code = r"""
         [[[
+            # This code should run twice.
+            # - The first time, it creates a file called 1 and requests a restart.
+            # - This triggers the restart mechanism, to re-run the thing.
+            # - The second time, it creates a file called 2.
             import os
             if not os.path.exists('1'):
                 os.system('touch 1')
@@ -535,8 +508,8 @@ def test_at_end():
 def test_build_dir_created():
     code = r"""
         [[[ include mashlib.mash ]]]
-        [[[ shell('touch hello') ]]] 
-        [[[ shell('mkdir world') ]]] 
+        [[[ shell('touch hello') ]]]
+        [[[ shell('mkdir world') ]]]
     """
 
     # The first run creates the build directory but not the archive.
@@ -568,9 +541,11 @@ def test_save1():
     """
     engage_string(code)
     assert os.path.isfile('.mash/hello.txt')
+    assert os.stat('.mash/hello.txt').st_size > 0
     os.system('cat .mash/hello.txt')
 
-    # Second time through, the file should be found in the archive instead.
+    # Whole thing again for coverage purposes.  This second time through, the
+    # file should be found in the archive instead.
     engage_string(code)
 
 def test_save2():
@@ -696,6 +671,9 @@ def test_push():
     code = """
         [[[ include mashlib.mash ]]]
         [[[
+            print(f'-->{self.content}<--')
+            print(f'-->{type(self)}<--')
+            print(f'-->{id(self)}<--')
             assert 'abc' in self.content
         |||
             [[[ push() ||| abc ]]]
@@ -844,7 +822,7 @@ def test_imprt5():
     # Return None if there's nothing to import.
     code = r"""
         [[[ include mashlib.mash ]]]
-        [[[ 
+        [[[
             x = imprt()
             assert x is None
         ]]]
@@ -855,17 +833,17 @@ def test_anonymous_name():
     # Different content gets a different anonymous name.
     code = r"""
         [[[ include mashlib.mash ]]]
-        [[[ 
+        [[[
             x = anonymous_name()
         |||
             a b c
-        ]]] 
-        [[[ 
+        ]]]
+        [[[
             y = anonymous_name()
         |||
             d e f
         ]]]
-        [[[ 
+        [[[
             z = anonymous_name()
         |||
             d e f
@@ -898,7 +876,7 @@ def test_shell_filter():
 def test_mashlib_root_node():
     code = r"""
         [[[ include mashlib.mash ]]]
-        [[[ 
+        [[[
             [[[
             ]]]
             [[[
@@ -914,7 +892,7 @@ def test_mashlib_root_node():
 def test_mashlib_root_name():
     code = r"""
         [[[ include mashlib.mash ]]]
-        [[[ 
+        [[[
             [[[
                 assert root_name() == 'dummy'
             ]]]
@@ -985,7 +963,7 @@ def test_spell_check2():
 def test_ext():
     code = r"""
         [[[ include mashlib.mash ]]]
-        [[[ 
+        [[[
             assert ext('paper.tex', 'pdf') == 'paper.pdf'
         ]]]
     """
@@ -996,7 +974,9 @@ def test_latex1():
     # Complain if a compiler is specified.
     code = r"""
         [[[ include latex.mash ]]]
-        [[[ latex(name='paper', compiler='latex') ]]]
+        [[[
+            latex(name='paper', compiler='latex')
+        ]]]
     """
     with pytest.raises(ValueError):
         engage_string(code)
@@ -1037,7 +1017,7 @@ def test_latex():
     code = r"""
         [[[ include latex.mash ]]]
         [[[ latex(name='paper') |||
-            \notactuallylatexcode 
+            \notactuallylatexcode
         ]]]
     """
     with pytest.raises(subprocess.CalledProcessError):
@@ -1212,7 +1192,7 @@ def test_xfig2():
             Landscape
             Center
             Inches
-            Letter  
+            Letter
             100.00
             Single
             -2
@@ -1238,7 +1218,7 @@ def test_xfig3():
             Landscape
             Center
             Inches
-            Letter  
+            Letter
             100.00
             Single
             -2
@@ -1264,7 +1244,7 @@ def test_xfig4():
             Landscape
             Center
             Inches
-            Letter  
+            Letter
             100.00
             Single
             -2
@@ -1288,7 +1268,7 @@ def test_xfig5():
             Landscape
             Center
             Inches
-            Letter  
+            Letter
             100.00
             Single
             -2

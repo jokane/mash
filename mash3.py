@@ -5,35 +5,27 @@
 # pylint: disable=exec-used
 # pylint: disable=global-statement
 
-"""This is a tool that allows text in various languages to be stored together
-in a single input file. along with instructions for manipulating, mutating, and
-storing that text."""
+"""
 
-# -- mash --
-#
-#
-# Q. Why?
-#
-# A1. Allows me to avoid naming things that appear only quickly in passing.
-# A2. Allows me to divide things into files based on content, rather than
-#     language.
-# A3. Can keep content and build instructions in the same place.
-#
-# History:
-#   2016-11-17: Started as a revision of some older, presentation-specific scripts.
-#   2016-12-12: First working version.
-#   2017-02-20: Various language additions, mostly for build commands.
-#   2017-04-20: More language expansions.  Better error handling.
-#   2017-07-11: Betting handling of semicolons in commands.
-#   2017-12-05: Better error messages.
-#   2018-04-06: @@ syntax for quick importing
-#   2018-07-26: Better handling of commas in commands.
-#   2018-08-17: & syntax for inserting chunks.
-#   2019-04-02: Starting major rewrite, replacing custom language with Python.
-#   2022-11-17: Starting second major overall, to allow parallel execution.
+-- mash --
+
+This is a tool that allows text in various languages to be stored together
+in a single input file. along with instructions for manipulating, mutating, and
+storing that text.
+
+Q. Why?
+
+A1. Allows me to avoid naming things that appear only quickly in passing.
+
+A2. Allows me to divide things into files based on content, rather than language.
+
+A3. Can keep content and build instructions in the same place.
+
+"""
 
 import enum
 import heapq
+import itertools
 import os
 import re
 import shutil
@@ -84,8 +76,8 @@ class Address:
 class Element:
     """A single string, a token indicating the start or end of a frame, or a
     separator token marking the difference between code and text parts of a
-    frame.  Each of these associated with an address where it started.  Used in
-    the process of parsing the frame tree."""
+    frame.  Each of is these associated with an address where it started.  Used
+    in the process of parsing the frame tree."""
 
     def __init__(self, address, content):
         self.address = address
@@ -94,40 +86,64 @@ class Element:
     def __str__(self):
         return f'{self.address} {repr(self.content)}'
 
-class Stats:
-    """Statistics for the complexity of a frame tree."""
-    def __init__(self, frames, codes, includes):
-        self.frames = frames
-        self.codes = codes
-        self.includes = includes
-
-    def __add__(self, other):
-        return Stats(self.frames + other.frames,
-                     self.codes + other.codes,
-                     self.includes + other.includes)
-
-    def __eq__(self, other):
-        return (self.frames == other.frames
-                and self.codes == other.codes
-                and self.includes == other.includes)
+class Event:
+    """An atomic element of the execution.  Either the start or the finish of a
+    node's work."""
+    def __init__(self, node, start):
+        self.node = node
+        self.start = start
 
     def __str__(self):
-        return f'{self.frames} frames; {self.codes} code blocks; {self.includes} includes'
+        return f'{"start" if self.start else "finish"} {self.node}'
+
+    def __hash__(self):
+        return hash((self.node, self.start))
+
+    def __eq__(self, other):
+        return self.node == other.node and self.start == other.start
+
+    def __call__(self, variables):
+        """Make this event actually happen."""
+        if self.start:
+            return self.node.start(variables)
+        return self.node.finish(variables)
+
+def Start(node):
+    """Shortcut for creating start events."""
+    return Event(node, True)
+
+def Finish(node):
+    """Shortcut for creating finish events."""
+    return Event(node, False)
+
 
 class FrameTreeNode(ABC):
     """A node in the frame tree.  Could be a frame (i.e. an internal node), a
     text block (a leaf containing completed text) or a code block (a leaf
     containing code to be executed)."""
 
+    next_node_num = 0
+
     def __init__(self, address, parent):
         self.address = address
         self.parent = parent
+        self.executed = False
+        self.num = FrameTreeNode.next_node_num
+        FrameTreeNode.next_node_num += 1
+
+    def __str__(self):
+        return f'{self.__class__.__name__}:{self.num:03d}'
 
     @abstractmethod
-    def execute(self, variables):
-        """Do the work represented by this node, if any.  Return a list of
-        objects that should replace this one in the tree and a Stats object
-        quantifying the work that was done to get there."""
+    def start(self, variables):
+        """Do the initial wok represented by this node, if any.  Return True if
+        this execution has changed the tree structure, i.e. new nodes, removed
+        nodes, etc., or False if not."""
+
+    @abstractmethod
+    def finish(self, variables):
+        """Same as start, but for things that should happen to wrap things up
+        for this node."""
 
     @abstractmethod
     def as_indented_string(self, indent_level=0):
@@ -138,111 +154,73 @@ class FrameTreeNode(ABC):
     def all_nodes(self):
         """Return a generator that yields all of the nodes in this tree."""
 
-    def get_constraints(self, root): #pylint: disable=unused-argument,no-self-use
-        """Return an iterable of (node1, node2) pairs indicating that node1 should
-        be executed before node2.  Generally should be based on the contraints
-        specified or implicitly existing at this node.  Usually either node1 or
-        node2 will be self (i.e. constraints for this node to be executed
-        before or after another node) but that's not strictly necessary)."""
+    @abstractmethod
+    def constraints(self, root): #pylint: disable=unused-argument,no-self-use
+        """Return an iterable of (event1, event2) pairs indicating that event1
+        should happened before event2."""
 
-        # By default, there are no constraints.
-        yield from ()
-
-    def get_all_constraints(self):
+    def all_constraints(self):
         """Return a list of all of the constraints in this tree."""
         for node in self.all_nodes():
-            yield from node.get_constraints(self)
-
-
-    def announce(self, variables):
-        """Print some details about this node, to be called just before
-        executing."""
-        print(f"Executing {type(self)} with {len(variables)} variables:")
-        print(self.as_indented_string(indent_level=1), end='')
-        print()
+            yield from node.constraints(self)
 
 def default_variables():
     """Return a dictionary to use as the variables in cases where no
     variables dict has been established yet."""
     return {
         'RestartRequest': RestartRequest,
-        'TextLeaf': TextLeaf,
         'versions': { 'mash': MASH_VERSION }
     }
 
 class Frame(FrameTreeNode):
-    """A frame represents a block containing some text along with code that
-    should operate on that text."""
+    """A frame represents a block containing some (optional) text along with
+    (optional) code that should operate on that text."""
     def __init__(self, address, parent):
         super().__init__(address, parent)
         self.children = []
         self.separated = False
-        self.content = None
-        self.result = []
+        self.content = ''
+
+    def constraints(self, root):
+        # Start before we finish.
+        yield (Start(self), Finish(self))
+
+        # Start before our children start. Finish after our children finish.
+        for child in self.children:
+            yield (Start(self), Start(child))
+            yield (Finish(child), Finish(self))
+
+        # Non-code children, followed by code children.
+        ordered_kids = ([ x for x in self.children if not isinstance(x, CodeLeaf)]
+                        + [ x for x in self.children if isinstance(x, CodeLeaf)])
+        for child1, child2 in itertools.pairwise(ordered_kids):
+            yield (Finish(child1), Start(child2))
 
     def as_indented_string(self, indent_level=0):
         r = ''
-        r += ('  '*indent_level) + f'[[[ {self.address}\n'
+        r += ('  '*indent_level) + f'[[[ {self.address} {self}\n'
         for child in self.children:
             r += child.as_indented_string(indent_level+1)
         r += ('  '*indent_level) + ']]]\n'
         return r
+
+    def start(self, variables):
+        return False
+
+    def finish(self, variables):
+        # Nothing to do.  Note this means the content of a frame is discarded
+        # unless something is done with it.  This often involves functions like
+        # save() or push() from mashlib.
+        return False
 
     def all_nodes(self):
         yield self
         for child in self.children:
             yield from child.all_nodes()
 
-    def execute(self, variables):
-        """Do the work for this frame.  Run each of the children, pull their
-        results, and then run any code elements here."""
-        self.announce(variables)
-
-        stats = Stats(1, 0, 0)
-
-        # Execute all of the child frames.
-        stats += self.execute_children(variables, True)
-
-        # Reap the text from each of the text children into one place, removing
-        # the TextLeaves as we go.
-        new_children = []
-        self.content = ''
-        for child in self.children:
-            if isinstance(child, TextLeaf):
-                self.content += str(child.content)
-            else:
-                new_children.append(child)
-        self.children = new_children
-
-        # Child frames are done.  Our child list should now be just code
-        # leaves.  Execute each of them.  They might access the accumulated
-        # text in self.content if they want.  They might also add things so
-        # self.result to be returned from here.
-        stats += self.execute_children(variables, False)
-
-        # All done.  Whatever got added to self.result should replace this
-        # frame in the tree.
-        return self.result, stats
-
-    def execute_children(self, variables, frames_only):
-        """Execute each child in sequence.  Replace each child with the
-        replacements that it returns."""
-        new_children = []
-        stats = Stats(0, 0, 0)
-        for child in self.children:
-            if frames_only and not isinstance(child, Frame):
-                new_children.append(child)
-            else:
-                child_result, child_stats = child.execute(variables)
-                new_children += child_result
-                stats += child_stats
-
-        self.children = new_children
-
-        return stats
 
 class FrameTreeLeaf(FrameTreeNode):
-    """A leaf node.  Base class for CodeLeaf, TextLeaf, and IncludeLeaf."""
+    """A leaf node.  Base class for CodeLeaf and TextLeaf."""
     def __init__(self, address, parent, content):
         super().__init__(address, parent)
         self.content = content
@@ -256,25 +234,18 @@ class FrameTreeLeaf(FrameTreeNode):
         if len(x) > 60:
             x = x[:60] + '...'
         return (('  '*indent_level)
-          + f'{self.line_marker()} {x} {self.address}\n')
+          + f'{self.line_marker()} {x} {self.address} {self}\n')
 
     def all_nodes(self):
         yield self
 
 class CodeLeaf(FrameTreeLeaf):
     """A leaf node representing Python code to be executed."""
-    def get_constraints(self, root):
-        # For now, use a default set of constaints that give the class mash
-        # behavior.
+    def constraints(self, root):
+        yield (Start(self), Finish(self))
 
-        # Execute each non-root node before its parent.
-        if self.parent is not None:
-            yield (self, self.parent)
-
-    def execute(self, variables):
+    def start(self, variables):
         """ Execute our text as Python code."""
-        self.announce(variables)
-
         # Give the code access to the frame we are executing in (self) and to
         # this actual object (leaf).
         variables['self'] = self.parent
@@ -288,7 +259,7 @@ class CodeLeaf(FrameTreeLeaf):
         # Fix the indentation.
         source = unindent(self.content)
 
-        # Shift so that the line numbers in any exceptions match the actual
+        # Shift so that the line numbers in any stack traces match the actual
         # source address.
         source = ('\n'*(self.address.lineno-1)) + source
 
@@ -301,34 +272,55 @@ class CodeLeaf(FrameTreeLeaf):
             code_obj = compile("after_code_hook(leaf)", self.address.filename, 'exec')
             exec(code_obj, variables, variables)
 
-        return [], Stats(0, 1, 0)
+        # Done!
+        return False
+
+    def finish(self, variables):
+        return False
 
     def line_marker(self):
         return '*'
 
 class TextLeaf(FrameTreeLeaf):
     """A leaf node representing just text."""
+    def constraints(self, root):
+        yield (Start(self), Finish(self))
 
-    def execute(self, variables):
-        """ Nothing to do here."""
-        return [ self ], Stats(0, 0, 0)
+    def start(self, variables):
+        return False
+
+    def finish(self, variables):
+        if self.parent is not None:
+            self.parent.content += self.content
+        return False
 
     def line_marker(self):
         return '.'
 
-class IncludeLeaf(FrameTreeLeaf):
-    """A leaf node representing the inclusion of another mash file."""
-    def execute(self, variables):
-        """Load the file and execute it."""
-        self.announce(variables)
+class IncludeNode(FrameTreeNode):
+    """A node representing the inclusion of another mash file.  Starts as a
+    leaf.  When this node is started, we locate, load, and parse the
+    requested file.  That tree becomes as child of this node."""
+    def __init__(self, address, parent, content):
+        super().__init__(address, parent)
+        self.tree = None
+        self.content = content
 
+    def constraints(self, root):
+        if self.tree is not None:
+            yield (Start(self), Start(self.tree))
+            yield (Finish(self.tree), Finish(self))
+        else:
+            yield (Start(self), Finish(self))
+
+    def start(self, variables):
+        """Load the file, parse it, and keep track of the tree it generates."""
         ok = False
 
         look_in = [ original_cwd ] + sys.path
         for directory in look_in:
             x = os.path.join(directory, self.content)
             if os.path.exists(x):
-                print(x)
                 ok = True
                 break
 
@@ -341,24 +333,33 @@ class IncludeLeaf(FrameTreeLeaf):
         with open(x, 'r', encoding='utf-8') as input_file:
             text = input_file.read()
 
-        root = tree_from_string(text, self.content)
+        self.tree = tree_from_string(text, self.content)
 
-        if root is None:
+        if self.tree is None:
             print(f'[{self.content}: nothing there]')
-            return [], Stats(0, 0, 0)
+            return False
 
-        result, stats = root.execute(variables)
+        return True
 
-        return result, stats + Stats(0, 0, 1)
+    def finish(self, variables):
+        return False
 
-    def line_marker(self):
-        return '#'
+    def all_nodes(self):
+        yield self
+        if self.tree is not None:
+            yield from self.tree.all_nodes()
+
+    def as_indented_string(self, indent_level=0):
+        r = ('  '*indent_level) + f'# include {self.content} {self}\n'
+        if self.tree is not None:
+            r += self.tree.as_indented_string(indent_level+1)
+        return r
 
 def unindent(s):
     """Given a string, modify each line by removing the whitespace that appears
     at the start of the first line."""
     # Find the prefix that we want to remove.  It is the sequence
-    # of tabs or spaces that preceeds the first real character.
+    # of tabs or spaces that precedes the first real character.
     match = re.search(r'([ \t]*)[^ \t\n]', s, re.M)
 
     # If we found a prefix, remove it from the start of every line.
@@ -500,7 +501,7 @@ def tree_from_element_seq(seq):
             else:
                 match = re.match(r'\s*include\s+(\S+)\s*', element.content)
                 if match:
-                    leaf = IncludeLeaf(element.address, frame, match.group(1))
+                    leaf = IncludeNode(element.address, frame, match.group(1))
                 else:
                     leaf = CodeLeaf(element.address, frame, element.content)
             frame.children.append(leaf)
@@ -524,11 +525,76 @@ def tree_from_element_seq(seq):
 
 def run_tree(root):
     """Execute the given tree."""
+    verbose = False
+
     variables = default_variables()
-    result, stats = root.execute(variables)
+    stats = {}
+    executed_events = set()
+
+    def do_one_pass():
+
+        all_events = ([Start(x) for x in root.all_nodes()]
+                  + [Finish(x) for x in root.all_nodes()])
+
+        constraints = list(root.all_constraints())
+
+        if verbose:
+            print('\n\n')
+            print('Starting a new pass on this tree:')
+            print(root.as_indented_string())
+            print('With these constraints:')
+            for before, after in constraints:
+                print(' ', before, 'before', after)
+
+        again = False
+
+        for event in all_events:
+            # Already done?
+            if event in executed_events:
+                continue
+
+            # Any constraint preventing us from executing this one yet?
+            ready = True
+            for before, after in constraints:
+                if before in executed_events:
+                    continue
+                if after != event:
+                    continue
+                ready = False
+                break
+            if not ready:
+                again = True
+                continue
+
+            # This event is ready to execute.  Record the statistics.
+            t = type(event)
+            try:
+                stats[t] += 1
+            except KeyError:
+                stats[t] = 1
+
+            # Actually execute it.
+            executed_events.add(event)
+            if verbose:
+                print('Running:', event)
+            changed = event(variables)
+
+            # Did the tree structure change when we executed?  If so, we need
+            # to start over to catch possible new nodes and new constraints.
+            if changed:
+                return True
+
+        # Done with this pass.  But if we skipped any nodes, we need to do
+        # at least one more pass.
+        return again
+
+    while do_one_pass():
+        pass
+
     if 'at_end' in variables:
         variables['at_end']()
-    return result, stats
+
+    return stats
 
 def run_from_args(argv):
     """Actually do things, based on what the command line asked for."""
@@ -549,7 +615,7 @@ def run_from_args(argv):
     else:
         input_filename = argv[1]
 
-    node = IncludeLeaf(Address(input_filename, 1, 1), None, input_filename)
+    node = IncludeNode(Address(input_filename, 1, 1), None, input_filename)
 
     def report_exception(e):
         print(e)
@@ -561,7 +627,7 @@ def run_from_args(argv):
         decode_and_print_if_not_empty(e.stderr)
 
     try:
-        _, stats = run_tree(node)
+        stats = run_tree(node)
     except subprocess.CalledProcessError as e:
         report_exception(e)
         return e.returncode
@@ -572,7 +638,7 @@ def run_from_args(argv):
 
     print(f"{stats}; {elapsed} seconds")
 
-    return 0
+    return stats
 
 def engage(argv):
     """ Main entry point."""
@@ -582,10 +648,12 @@ def engage(argv):
     while not done:
         os.chdir(original_cwd)
         try:
-            run_from_args(argv)
+            stats = run_from_args(argv)
             done = True
         except RestartRequest:
             pass
+
+    return stats
 
 
 if __name__ == '__main__': # pragma no cover
