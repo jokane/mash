@@ -188,6 +188,9 @@ def recall(target, *sources):
     given sources.  If so, copy it over and return the True.  If not, do
     nothing and return False."""
 
+    for source in sources:
+        assert isinstance(source, str)
+
     archive_target = os.path.join(archive_directory, target)
 
     ok = True
@@ -214,7 +217,7 @@ def recall(target, *sources):
                 else:
                     print(f" {source}", end='')
         else:
-            print(" [no sources]")
+            print(" [no sources]", end='')
 
     print()
 
@@ -225,8 +228,10 @@ def recall(target, *sources):
             if os.path.exists(target):
                 shutil.rmtree(target)
             shutil.copytree(archive_target, os.path.join(build_directory, target))
+        print('   [recalled]')
         return True
     else:
+        print('   [not recalled]')
         return False
 
 def keep(file_to_keep, target=None):
@@ -245,7 +250,7 @@ def keep(file_to_keep, target=None):
         target = file_to_keep
     target = os.path.join(keep_directory, target)
 
-    print('keep: ', file_to_keep, target)
+    print('keep:', file_to_keep, '-->', target)
 
     # Make sure the destintation directory exists.  Note that we can't just
     # check for the keep directory itself, because the target might be in a
@@ -318,7 +323,7 @@ def imprt(*fnames, target=None, conditional=False):
 
         # Does this file exist already?  If not, copy it in.
         if not os.path.isfile(to) or not filecmp.cmp(fr, to, False):
-            print(fr)
+            print('imprt:', fr)
             shutil.copy2(fr, to)
 
     # Return the name of the (last) imported file.
@@ -421,6 +426,11 @@ def root_mash_name():
 def root_name():
     """Return the base name of the root filename."""
     return re.sub(".mash", "", root_mash_name())
+
+def tree_from_file(filename):
+    with open(filename, 'r') as file_obj:
+        text = file_obj.read()
+    return tree_from_string(text, filename)
 
 
 ]]]

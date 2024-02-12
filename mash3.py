@@ -24,6 +24,7 @@ A3. Can keep content and build instructions in the same place.
 """
 
 import enum
+import errno
 import heapq
 import itertools
 import os
@@ -64,10 +65,10 @@ class Address:
     def __str__(self):
         return f'({self.filename}, line {self.lineno}, offset {self.offset})'
 
-    def exception(self, message, type_=ValueError):
+    def exception(self, message=None, exception=None, type_=ValueError):
         """Something went wrong at this address.  Complain, mentioning the
         address."""
-        exception = type_(f'{self}: {message}')
+        exception = exception if exception else type_(f'{self}: {message}')
         exception.filename = self.filename
         exception.lineno = self.lineno
         exception.offset = self.offset
@@ -174,6 +175,7 @@ def default_variables():
     variables dict has been established yet."""
     return {
         'RestartRequest': RestartRequest,
+        'tree_from_string': tree_from_string,
         'versions': { 'mash': MASH_VERSION }
     }
 
@@ -340,17 +342,18 @@ class IncludeNode(FrameTreeNode):
 
         look_in = [ original_cwd ] + sys.path
         for directory in look_in:
-            print(directory, self.content)
             x = os.path.join(directory, self.content)
             if os.path.exists(x):
                 ok = True
                 break
 
         if not ok:
-            self.address.exception(f"Trying to include {self.content},"
-                                   + "but could not find it in any of these places:\n"
-                                   + '\n'.join(look_in),
-                                   type_=FileNotFoundError)
+            message = (f"\nTrying to include {self.content}, "
+                      + "but could not find it in any of these places:\n  "
+                      + '\n  '.join(look_in)
+                      + f'\nInclude initiated from {self.address}')
+            exc = FileNotFoundError(errno.ENOENT, message, self.content)
+            raise exc
 
         with open(x, 'r', encoding='utf-8') as input_file:
             text = input_file.read()
@@ -562,9 +565,9 @@ def run_tree(root, verbose=False):
             print('\n\n')
             print('Starting a new pass on this tree:')
             print(root.as_indented_string())
-            print('With these constraints:')
-            for before, after in constraints:
-                print(' ', before, 'before', after)
+            # print('With these constraints:')
+            # for before, after in constraints:
+            #     print(' ', before, 'before', after)
 
         again = False
 
@@ -603,6 +606,8 @@ def run_tree(root, verbose=False):
             # Did the tree structure change when we executed?  If so, we need
             # to start over to catch possible new nodes and new constraints.
             if changed:
+                if verbose:
+                    print('Tree has changed.  Ending this pass')
                 return True
 
         # Done with this pass.  But if we skipped any nodes, we need to do
@@ -630,6 +635,12 @@ def run_from_args(argv):
         if len(argv) == 1:
             return 0
 
+    if '-v' in argv:
+        verbose = True
+        argv.remove('-v')
+    else:
+        verbose = False
+
     if len(argv) == 1:
         print('[reading from stdin]')
         input_filename = '/dev/stdin'
@@ -648,7 +659,7 @@ def run_from_args(argv):
         decode_and_print_if_not_empty(e.stderr)
 
     try:
-        stats = run_tree(node)
+        stats = run_tree(node, verbose)
     except subprocess.CalledProcessError as e:
         report_exception(e)
         return e.returncode
