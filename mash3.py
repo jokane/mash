@@ -93,15 +93,16 @@ class Event:
     def __init__(self, node, start):
         self.node = node
         self.start = start
+        self.the_hash = hash((id(self.node), self.start))
 
     def __str__(self):
         return f'{"start" if self.start else "finish"} {self.node}'
 
     def __hash__(self):
-        return hash((self.node, self.start))
+        return self.the_hash
 
     def __eq__(self, other):
-        return self.node == other.node and self.start == other.start
+        return self.node is other.node and self.start == other.start
 
     def __call__(self, variables):
         """Make this event actually happen."""
@@ -554,54 +555,83 @@ def run_tree(root, verbose=False):
     stats = {}
     executed_events = set()
 
+    passes = 0
+
     def do_one_pass():
+        # Build a dictionary of the as-yet-unsatisfied ordering constraints.
+        # Keys are not-yet-executed events, and values are other sets of other
+        # events that must be completed first.
+        constraints_by_event = {}
+        for node in root.all_nodes():
+            e = Start(node)
+            if e not in executed_events:
+                constraints_by_event[e] = set()
+            e = Finish(node)
+            if e not in executed_events:
+                constraints_by_event[e] = set()
 
-        all_events = ([Start(x) for x in root.all_nodes()]
-                  + [Finish(x) for x in root.all_nodes()])
+        all_constraints = list(root.all_constraints())
+        for before, after in all_constraints:
+            if before not in executed_events and after not in executed_events:
+                constraints_by_event[after].add(before)
+            #     print(f'Adding {before} before {after}.')
+            #     for event in executed_events:
+            #         print('  ', event)
+            # else:
+            #     print(f'Skipping {before} before {after} because {before} is already done.')
 
-        constraints = list(root.all_constraints())
+        # Keep working until we've finished.  One iteration of this loop will
+        # execute one event.
+        while len(constraints_by_event.keys()) > 0:
+            if verbose:
+                print('\n\n')
+                print(f'Pass {passes}: {len(constraints_by_event.keys())} events remaining, {len(executed_events)} events executed and {len(all_constraints)} constraints')
+                print(root.as_indented_string())
+                print('With executed events:')
+                for event in executed_events:
+                    print('  ', event)
+                print('With these constraints:')
+                for event, befores in constraints_by_event.items():
+                    print(f'Befores for {event}:')
+                    for before in befores:
+                        print(f'  {before}')
+                    if len(befores) == 0:
+                        print(f'  (none)')
 
-        if verbose:
-            print('\n\n')
-            print('Starting a new pass on this tree:')
-            print(root.as_indented_string())
-            # print('With these constraints:')
-            # for before, after in constraints:
-            #     print(' ', before, 'before', after)
 
-        again = False
+            # Look for an event that is ready to execute.
+            ready_event = None
+            for event, befores in constraints_by_event.items():
+                if len(befores) == 0:
+                    ready_event = event
+                    break
 
-        for event in all_events:
-            # Already done?
-            if event in executed_events:
-                continue
+            assert ready_event is not None
 
-            # Any constraint preventing us from executing this one yet?
-            ready = True
-            for before, after in constraints:
-                if before in executed_events:
-                    continue
-                if after != event:
-                    continue
-                ready = False
-                break
-            if not ready:
-                again = True
-                continue
+            # Found one.  Record the statistics, but only on the start so we don't
+            # double count.
+            if verbose:
+                print(f'Ready to execute {ready_event}.')
 
-            # This event is ready to execute.  Record the statistics.
-            if event.start:
-                t = type(event.node)
+            if ready_event.start:
+                t = type(ready_event.node)
                 try:
                     stats[t] += 1
                 except KeyError:
                     stats[t] = 1
-
+            
             # Actually execute it.
-            executed_events.add(event)
             if verbose:
-                print('Running:', event)
+                print('Running:', ready_event)
             changed = event(variables)
+
+            # Bookkeeping: Remove the event we just compelted from the list of
+            # things to do.  Add it to the list of things we've done.  Remove
+            # it from any lists of unsatisfied constraints.
+            del constraints_by_event[ready_event]
+            executed_events.add(ready_event)
+            for event, befores in constraints_by_event.items():
+                befores.discard(ready_event)
 
             # Did the tree structure change when we executed?  If so, we need
             # to start over to catch possible new nodes and new constraints.
@@ -610,12 +640,14 @@ def run_tree(root, verbose=False):
                     print('Tree has changed.  Ending this pass')
                 return True
 
-        # Done with this pass.  But if we skipped any nodes, we need to do
-        # at least one more pass.
-        return again
+            # End of the main while loop.
+
+
+        # Done!
+        return False
 
     while do_one_pass():
-        pass
+        passes += 1
 
     if 'at_end' in variables:
         variables['at_end']()
@@ -691,3 +723,4 @@ def engage(argv):
 
 if __name__ == '__main__': # pragma no cover
     engage(sys.argv)
+
