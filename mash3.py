@@ -177,7 +177,7 @@ def default_variables():
     return {
         'RestartRequest': RestartRequest,
         'tree_from_string': tree_from_string,
-        'versions': { 'mash': MASH_VERSION }
+        'versions': { 'mash': MASH_VERSION },
     }
 
 class Frame(FrameTreeNode):
@@ -266,6 +266,7 @@ class CodeLeaf(FrameTreeLeaf):
         # this actual object (leaf).
         variables['self'] = self.parent
         variables['leaf'] = self
+        variables['tree_changed'] = False
 
         # Run the stuff that's supposed to run before the stuff.
         if "before_code_hook" in variables:
@@ -289,7 +290,7 @@ class CodeLeaf(FrameTreeLeaf):
             exec(code_obj, variables, variables)
 
         # Done!
-        return False
+        return variables['tree_changed']
 
     def finish(self, variables):
         return False
