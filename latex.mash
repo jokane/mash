@@ -116,7 +116,7 @@ def latex(name, compiler=None, ignore_deps=None, keep_pdf=True, callback=None,
             last_log = log
 
         if latex_mode == 'latex':
-            shell(f'dvipdf {name}.dvi')
+            shell(f'dvipdf -dALLOWTRANSPARENCY {name}.dvi')
 
         # If we are doing strict checking, dig through the final log, looking
         # for problems.
