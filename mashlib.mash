@@ -393,8 +393,7 @@ def push(text = None):
     of the current frame, into the parent frame."""
     if text is None:
         text = self.content
-    self.parent.content += text
-    # self.result.append(TextLeaf(leaf.address, self.parent, text))
+    self.parent.content += str(text)
 
 
 def unindent():
